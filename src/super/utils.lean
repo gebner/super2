@@ -1,4 +1,6 @@
 
+attribute [inline] or.decidable decidable.to_bool bool.decidable_eq and.decidable
+
 meta def format.form (as : list format) : format :=
 (format.join (as.intersperse format.line)).paren.group
 
@@ -98,3 +100,29 @@ match e with
   some $ expr.sort (l.instantiate_univ_mvars subst)
 | _ := none
 end
+
+lemma or_imp_congr {p p' q q'} (hp : p → p') (hq : q → q') : p ∨ q → p' ∨ q'
+| (or.inl h) := or.inl (hp h)
+| (or.inr h) := or.inr (hq h)
+
+lemma or_imp_congr_left {p q r} (h : q → r) : q ∨ p → r ∨ p :=
+or_imp_congr h id
+
+lemma or_imp_congr_right {p q r} (h : q → r) : p ∨ q → p ∨ r :=
+or_imp_congr id h
+
+lemma or_imp_congr_right_strong {p q r} (h : ¬ p → q → r) : p ∨ q → p ∨ r :=
+match classical.prop_decidable p with
+| decidable.is_true hp := λ _, or.inl hp
+| decidable.is_false hp := or_imp_congr_right (h hp)
+end
+
+lemma imp_iff_or_not {p q : Prop} : (p → q) ↔ (¬ p ∨ q) :=
+by cases classical.prop_decidable p; simp *
+
+def list.has_dups_core {α} [decidable_eq α] : list α → list α → bool
+| (x::xs) ys := x ∈ ys ∨ xs.has_dups_core (x::ys)
+| [] _ := ff
+
+def list.has_dups {α} [decidable_eq α] (xs : list α) : bool :=
+xs.has_dups_core []

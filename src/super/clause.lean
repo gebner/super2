@@ -61,6 +61,7 @@ meta def of_expr : expr → clause_type
 meta def to_expr : clause_type → expr
 | ff := `(false)
 | (or a b) := `(%%a.to_expr ∨ %%b.to_expr)
+| (imp a ff) := `(¬ %%a)
 | (imp a b) := `((%%a : Prop) → (%%b.to_expr : Prop))
 | (atom a) := a
 
@@ -114,6 +115,9 @@ meta def of_proof (prf : expr) : tactic clause := do
 ty ← infer_type prf,
 of_type_and_proof ty prf
 
+meta def literals (c : clause) : list literal :=
+c.ty.literals
+
 meta def instantiate_mvars (cls : clause) : tactic clause :=
 clause.mk <$> cls.ty.instantiate_mvars <*> tactic.instantiate_mvars cls.prf
 
@@ -122,6 +126,9 @@ meta def abstract_mvars (cls : clause) (mvars : list name) : clause :=
 
 meta def abstract_mvars' (cls : clause) (mvars : list expr) : clause :=
 cls.abstract_mvars (mvars.map expr.meta_uniq_name)
+
+meta def check (cls : clause) : tactic unit :=
+infer_type cls.prf >>= is_def_eq cls.ty.to_expr
 
 end clause
 
