@@ -13,6 +13,10 @@ match e with
 | _ := ms
 end
 
+meta def list.dup_by_native {α β} [has_lt β] [decidable_rel ((<) : β → β → Prop)]
+  (f : α → β) (xs : list α) : list α :=
+rb_map.values $ xs.foldl (λ m x, m.insert (f x) x) mk_rb_map
+
 private meta def level.meta_vars_core : level → name_set → name_set
 | level.zero := id
 | (level.param _) := id
@@ -101,6 +105,19 @@ match e with
 | _ := none
 end
 
+/-- `local_binding_info e` returns the binding info of `e` if `e` is a local constant.
+Otherwise returns `binder_info.default`. -/
+meta def expr.local_binding_info : expr → binder_info
+| (expr.local_const _ _ bi _) := bi
+| _ := binder_info.default
+
+meta def expr.mk_lambda (x e : expr) : expr :=
+expr.lam x.local_pp_name x.local_binding_info x.local_type (e.abstract x)
+
+meta def expr.app' : expr → expr → expr
+| (expr.lam _ _ _ a) b := a.instantiate_var b
+| a b := a b
+
 lemma or_imp_congr {p p' q q'} (hp : p → p') (hq : q → q') : p ∨ q → p' ∨ q'
 | (or.inl h) := or.inl (hp h)
 | (or.inr h) := or.inr (hq h)
@@ -119,6 +136,24 @@ end
 
 lemma imp_iff_or_not {p q : Prop} : (p → q) ↔ (¬ p ∨ q) :=
 by cases classical.prop_decidable p; simp *
+
+lemma not_imp_iff_or {p q : Prop} : (¬ p → q) ↔ (p ∨ q) :=
+by cases classical.prop_decidable p; simp *
+
+@[simp] theorem and_imp {a b c} : (a ∧ b → c) ↔ (a → b → c) :=
+iff.intro (λ h ha hb, h ⟨ha, hb⟩) (λ h ⟨ha, hb⟩, h ha hb)
+
+theorem not.imp_symm {a b} (h : ¬a → b) (hb : ¬b) : a :=
+classical.by_contradiction $ hb ∘ h
+
+theorem classical.not_forall {α} {p : α → Prop} :
+  (¬ ∀ x, p x) ↔ ∃ x, ¬ p x :=
+⟨not.imp_symm $ λ nx x, nx.imp_symm $ λ h, ⟨x, h⟩,
+ λ ⟨x, h⟩ h2, h (h2 _)⟩
+
+lemma classical.forall_imp_iff_exists_not_or {α} {p : α → Prop} {q : Prop} :
+  ((∀ x, p x) → q) ↔ ((∃ x, ¬ p x) ∨ q) :=
+by simp [imp_iff_or_not, classical.not_forall]
 
 def list.has_dups_core {α} [decidable_eq α] : list α → list α → bool
 | (x::xs) ys := x ∈ ys ∨ xs.has_dups_core (x::ys)

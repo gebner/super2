@@ -89,6 +89,15 @@ meta def instantiate_vars (es : list expr) : clause_type → clause_type
 | (imp a b) := imp (a.instantiate_vars es) b.instantiate_vars
 | (atom a) := atom (a.instantiate_vars es)
 
+meta def pos_lits (ty : clause_type) : list expr :=
+do literal.pos l ← ty.literals | [], [l]
+
+meta def neg_lits (ty : clause_type) : list expr :=
+do literal.neg l ← ty.literals | [], [l]
+
+meta def is_taut (ty : clause_type) : bool :=
+ty.pos_lits ∩ ty.neg_lits ≠ []
+
 end clause_type
 
 @[derive decidable_eq]
@@ -113,6 +122,7 @@ meta def of_type_and_proof : expr → expr → tactic clause
 
 meta def of_proof (prf : expr) : tactic clause := do
 ty ← infer_type prf,
+ty ← head_beta ty,
 of_type_and_proof ty prf
 
 meta def literals (c : clause) : list literal :=
@@ -127,8 +137,11 @@ meta def abstract_mvars (cls : clause) (mvars : list name) : clause :=
 meta def abstract_mvars' (cls : clause) (mvars : list expr) : clause :=
 cls.abstract_mvars (mvars.map expr.meta_uniq_name)
 
+meta def is_taut (cls : clause) : bool :=
+cls.ty.is_taut
+
 meta def check (cls : clause) : tactic unit :=
-infer_type cls.prf >>= is_def_eq cls.ty.to_expr
+type_check cls.prf >> infer_type cls.prf >>= is_def_eq cls.ty.to_expr
 
 end clause
 
