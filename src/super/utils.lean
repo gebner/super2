@@ -161,3 +161,24 @@ def list.has_dups_core {α} [decidable_eq α] : list α → list α → bool
 
 def list.has_dups {α} [decidable_eq α] (xs : list α) : bool :=
 xs.has_dups_core []
+
+def list.zip_with_index_core {α} : ℕ → list α → list (α × ℕ)
+| _ [] := []
+| i (x::xs) := (x,i) :: list.zip_with_index_core (i+1) xs
+
+def list.zip_with_index {α} : list α → list (α × ℕ) :=
+list.zip_with_index_core 0
+
+def option.to_list {α} : option α → list α
+| none     := []
+| (some a) := [a]
+
+def list.filter_maximal {α} (gt : α → α → bool) (l : list α) : list α :=
+l.filter $ λ x, ∀ y ∈ l, ¬ gt y x
+
+/-- Makes the declaration `classical.prop_decidable` available to type class inference.
+This asserts that all propositions are decidable, but does not have computational content. -/
+meta def tactic.classical : tactic unit :=
+do h ← get_unused_name `_inst,
+   mk_const ``classical.prop_decidable >>= note h none,
+   unfreeze_local_instances

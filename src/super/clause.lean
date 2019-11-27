@@ -23,6 +23,18 @@ protected meta def to_tactic_fmt : literal → tactic format
 
 meta instance : has_to_tactic_format literal := ⟨literal.to_tactic_fmt⟩
 
+meta def is_pos : literal → bool
+| (pos _) := tt
+| (neg _) := ff
+
+meta def is_neg : literal → bool
+| (neg _) := tt
+| (pos _) := ff
+
+meta def formula : literal → expr
+| (neg f) := f
+| (pos f) := f
+
 end literal
 
 @[derive decidable_eq]
@@ -61,7 +73,7 @@ meta def of_expr : expr → clause_type
 meta def to_expr : clause_type → expr
 | ff := `(false)
 | (or a b) := `(%%a.to_expr ∨ %%b.to_expr)
-| (imp a ff) := `(¬ %%a)
+-- | (imp a ff) := `(¬ %%a)
 | (imp a b) := `((%%a : Prop) → (%%b.to_expr : Prop))
 | (atom a) := a
 
@@ -70,6 +82,9 @@ meta def literals : clause_type → list literal
 | (or a b) := a.literals ++ b.literals
 | (imp a b) := literal.neg a :: b.literals
 | (atom a) := [literal.pos a]
+
+meta def num_literals (ty : clause_type) : ℕ :=
+ty.literals.length
 
 meta def instantiate_mvars : clause_type → tactic clause_type
 | ff := pure ff
@@ -128,6 +143,9 @@ of_type_and_proof ty prf
 meta def literals (c : clause) : list literal :=
 c.ty.literals
 
+meta def num_literals (c : clause) : ℕ :=
+c.ty.num_literals
+
 meta def instantiate_mvars (cls : clause) : tactic clause :=
 clause.mk <$> cls.ty.instantiate_mvars <*> tactic.instantiate_mvars cls.prf
 
@@ -140,8 +158,12 @@ cls.abstract_mvars (mvars.map expr.meta_uniq_name)
 meta def is_taut (cls : clause) : bool :=
 cls.ty.is_taut
 
-meta def check (cls : clause) : tactic unit :=
-type_check cls.prf >> infer_type cls.prf >>= is_def_eq cls.ty.to_expr
+meta def check (cls : clause) : tactic unit := do
+when cls.prf.has_var (do prf ← pp cls.prf, fail $ to_fmt "proof has de Bruijn variables: " ++ prf),
+when cls.ty.to_expr.has_var
+  (do ty ← pp cls.ty, fail $ to_fmt "type has de Bruijn variables: " ++ ty),
+type_check cls.prf,
+infer_type cls.prf >>= is_def_eq cls.ty.to_expr
 
 end clause
 
@@ -170,6 +192,14 @@ ls ← mk_num_meta_univs c.univ_mvars.length,
 let ls_subst := rb_map.of_list (c.univ_mvars.zip ls),
 mvars ← unpack_mk_metas ls_subst c.free_var_tys,
 pure { ty := c.cls.ty.instantiate_vars mvars, prf := c.cls.prf.instantiate_vars mvars }
+
+meta def unpack_quantified (c : packed_clause) : tactic clause := do
+ls ← mk_num_meta_univs c.univ_mvars.length,
+let ls_subst := rb_map.of_list (c.univ_mvars.zip ls),
+let ty' := c.free_var_tys.foldr (expr.pi `h binder_info.default) c.cls.ty.to_expr,
+let prf' := c.free_var_tys.foldr (expr.lam `h binder_info.default) c.cls.prf,
+pure ⟨clause_type.atom (ty'.instantiate_univ_mvars ls_subst),
+  prf'.instantiate_univ_mvars ls_subst⟩
 
 end packed_clause
 
