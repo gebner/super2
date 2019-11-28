@@ -94,9 +94,11 @@ exact empty_clause
 meta def clauses_of_simp_arg_type : simp_arg_type → tactic (list clause)
 | simp_arg_type.all_hyps := do lctx ← local_context, lctx.mmap clause.of_proof
 | (simp_arg_type.except _) := fail "super [-foo] not supported"
-| (simp_arg_type.expr e) :=
+| (simp_arg_type.expr e) := do
   -- TODO: eqn lemmas
-  do e ← to_expr e, cls ← clause.of_proof e, pure [cls]
+  cls ← tactic.retrieve (to_expr e >>= clause.of_proof >>= clause.pack),
+  cls ← cls.unpack,
+  pure [cls]
 
 meta def clauses_of_simp_arg_type_list (simp_args : list simp_arg_type) : tactic (list clause) :=
 list.join <$> simp_args.mmap clauses_of_simp_arg_type
