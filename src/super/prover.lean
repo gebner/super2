@@ -2,6 +2,7 @@ import super.prover_state super.selection
   super.inferences.distinct super.inferences.resolution
   super.inferences.clausify super.inferences.empty_clause
   super.inferences.subsumption super.inferences.superposition
+  super.inferences.factoring
 
 namespace super
 open native tactic
@@ -22,6 +23,7 @@ meta def default_simplification_rules : list simplification_rule :=
 
 meta def default_inference_rules : list inference_rule :=
 [ inference.resolution,
+  inference.factoring,
   inference.forward_superposition,
   inference.backward_superposition,
   inference.unify_eq ]
