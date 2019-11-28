@@ -202,7 +202,8 @@ mk_metas_core c.free_var_tys
 meta def mk_locals (c : packed_clause) : tactic (list expr) :=
 mk_locals_core c.free_var_tys
 
-meta def refresh_univ_mvars (c : packed_clause) : tactic packed_clause := do
+meta def refresh_univ_mvars (c : packed_clause) : tactic packed_clause :=
+if c.univ_mvars = [] then pure c else do
 ls ← mk_num_meta_univs c.univ_mvars.length,
 let ls_subst := rb_map.of_list (c.univ_mvars.zip ls),
 pure {
