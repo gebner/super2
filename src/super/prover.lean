@@ -2,15 +2,16 @@ import super.prover_state super.selection
   super.inferences.distinct super.inferences.resolution
   super.inferences.clausify super.inferences.empty_clause
   super.inferences.subsumption super.inferences.superposition
-  super.inferences.factoring
+  super.inferences.factoring super.inferences.inhabited
 
 namespace super
 open native tactic
 
 meta def default_preprocessing_rules : list preprocessing_rule :=
 [ preprocessing.empty_clause,
-  preprocessing.distinct,
   preprocessing.clausify,
+  preprocessing.distinct,
+  preprocessing.inhabited,
   preprocessing.pos_refl,
   preprocessing.neg_refl,
   preprocessing.flip_eq,
@@ -129,7 +130,6 @@ _root_.super.solve_with_goal opts cs
 end tactic.interactive
 
 lemma foo (p : ℕ → Prop) (h1 : ∀ x, ¬ p x) : ∃ x, ¬ p (x + 1) :=
-let x : ℕ := 1 in
 by super *
 
 lemma bar (p : ℕ → Prop) : p 0 → (∀ x, p x → p (x + 1)) → p 10 :=

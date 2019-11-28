@@ -90,6 +90,18 @@ meta def literals : clause_type → list literal
 meta def num_literals (ty : clause_type) : ℕ :=
 ty.literals.length
 
+meta def num_pos_literals : clause_type → ℕ
+| ff := 0
+| (or a b) := a.num_pos_literals + b.num_pos_literals
+| (imp a b) := b.num_pos_literals
+| (atom a) := 1
+
+meta def num_neg_literals : clause_type → ℕ
+| ff := 0
+| (or a b) := a.num_neg_literals + b.num_neg_literals
+| (imp a b) := b.num_neg_literals + 1
+| (atom a) := 0
+
 meta def instantiate_mvars : clause_type → tactic clause_type
 | ff := pure ff
 | (or a b) := or <$> instantiate_mvars a <*> instantiate_mvars b

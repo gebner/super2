@@ -1,5 +1,6 @@
 
 attribute [inline] or.decidable decidable.to_bool bool.decidable_eq and.decidable
+  nat.decidable_eq ne.decidable decidable.false implies.decidable
 
 meta def format.form (as : list format) : format :=
 (format.join (as.intersperse format.line)).paren.group
