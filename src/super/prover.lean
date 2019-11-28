@@ -128,9 +128,6 @@ _root_.super.solve_with_goal opts cs
 
 end tactic.interactive
 
-set_option profiler true
--- set_option trace.type_context.is_def_eq true
--- set_option trace.type_context.is_def_eq_detail true
 lemma foo (p : ℕ → Prop) (h1 : ∀ x, ¬ p x) : ∃ x, ¬ p (x + 1) :=
 let x : ℕ := 1 in
 by super *
@@ -139,6 +136,6 @@ lemma bar (p : ℕ → Prop) : p 0 → (∀ x, p x → p (x + 1)) → p 10 :=
 by super
 
 lemma baz (a b c : ℕ) : a + (b + c) = (a + b) + c :=
-by super [add_assoc]
+by super [add_assoc, add_zero, add_comm]
 
 #print baz

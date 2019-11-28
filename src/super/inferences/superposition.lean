@@ -19,12 +19,13 @@ meta def clause.rewrite_in_ctx (ctx : expr) (ltr : bool)
 let a := if ltr then a else a.flip ai,
 some (literal.pos eq_f@`(@eq %%ty %%l %%r)) ← pure $ a.literals.nth ai,
 some t ← pure $ b.literals.nth bi,
-let (l',r') := if t.is_pos then (l, r) else (r, l),
-prf_subst ←
+let prf_subst :=
+  let lvls := eq_f.get_app_fn.const_levels in
   if t.is_pos then
-    mk_mapp ``eq.subst [ty, ctx, l, r]
+    expr.const' ``eq.subst lvls ty ctx l r
   else
-    mk_mapp ``eq.substr [ty, ctx, r, l],
+    expr.const' ``eq.substr lvls ty ctx r l,
+let (l',r') := if t.is_pos then (l, r) else (r, l),
 let c_subst : clause :=
   ⟨clause_type.imp eq_f (clause_type.imp (ctx.app' l')
     (clause_type.atom (ctx.app' r'))),
@@ -65,7 +66,7 @@ pure $ do
 some () ← try_core (unify l st transparency.reducible) | pure [],
 l ← instantiate_mvars l,
 r ← instantiate_mvars r,
-guard $ ¬ gt r l,
+tt ← pure (¬ gt r l : bool) | pure [],
 a ← a.cls.instantiate_mvars,
 b ← b.cls.instantiate_mvars,
 option.to_list <$> a.krewrite ltr ai b bi
@@ -91,8 +92,6 @@ pure $ do
 some () ← try_core (unify l r) | pure [],
 rfl_prf ← mk_eq_refl l,
 pure $ pure $ given.cls.propg_pos i rfl_prf
-
-set_option trace.compiler.optimize_bytecode true
 
 meta def simplification.pos_refl : simplification_rule | cls :=
 if ∃ l ∈ cls.literals, ↑match l with

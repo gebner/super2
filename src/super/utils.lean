@@ -223,3 +223,7 @@ meta def mk_locals_core : list expr → tactic (list expr)
 
 @[pattern] meta def expr.const' (n : name) (ls : list level) : expr :=
 expr.const n ls
+
+meta def expr.const_levels : expr → list level
+| (expr.const n ls) := ls
+| _ := []
