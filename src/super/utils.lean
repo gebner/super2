@@ -89,8 +89,8 @@ meta def abstract_mvar_telescope : list expr → tactic (list expr)
 | [] := pure []
 | (m :: ms) := do
   t ← infer_type m,
-  ms ← abstract_mvar_telescope ms,
-  pure $ t.abstract_mvars' ms :: ms
+  ms' ← abstract_mvar_telescope ms,
+  pure $ t.abstract_mvars' ms :: ms'
 
 /-- Runs a tactic for a result, reverting the state after completion -/
 meta def tactic.retrieve {α} (tac : tactic α) : tactic α :=
