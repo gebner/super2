@@ -89,7 +89,6 @@ hs ← if tgt = `(false) then pure hs else
   (::) <$> by_contradiction <*> pure hs,
 initial ← (++ initial) <$> hs.mmap clause.of_proof,
 some empty_clause ← main opts initial | fail "saturation",
-trace empty_clause,
 exact empty_clause
 
 meta def clauses_of_simp_arg_type : simp_arg_type → tactic (list clause)

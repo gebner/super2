@@ -17,6 +17,10 @@ meta def list.dup_by_native {α β} [has_lt β] [decidable_rel ((<) : β → β 
   (f : α → β) (xs : list α) : list α :=
 rb_map.values $ xs.foldl (λ m x, m.insert (f x) x) mk_rb_map
 
+meta def level.mvar_name : level → name
+| (level.mvar n) := n
+| _ := name.anonymous
+
 private meta def level.meta_vars_core : level → name_set → name_set
 | level.zero := id
 | (level.param _) := id
@@ -71,7 +75,7 @@ private meta def sorted_mvars_core : list expr → list expr → tactic (list ex
   else do
     t ← infer_type e,
     ctx ← sorted_mvars_core t.meta_vars.to_list ctx,
-    sorted_mvars_core es (expr.mvar n pp_n (t.abstract_mvars' ctx) :: ctx)
+    sorted_mvars_core es (e :: ctx)
 | [] ctx := pure ctx
 | (e::es) ctx := sorted_mvars_core (e.meta_vars.to_list ++ es) ctx
 
@@ -80,6 +84,13 @@ sorted_mvars_core es []
 
 meta def expr.sorted_mvars (e : expr) : tactic (list expr) :=
 expr.sorted_mvars' [e]
+
+meta def abstract_mvar_telescope : list expr → tactic (list expr)
+| [] := pure []
+| (m :: ms) := do
+  t ← infer_type m,
+  ms ← abstract_mvar_telescope ms,
+  pure $ t.abstract_mvars' ms :: ms
 
 /-- Runs a tactic for a result, reverting the state after completion -/
 meta def tactic.retrieve {α} (tac : tactic α) : tactic α :=
@@ -113,6 +124,15 @@ meta def expr.local_binding_info : expr → binder_info
 
 meta def expr.mk_lambda (x e : expr) : expr :=
 expr.lam x.local_pp_name x.local_binding_info x.local_type (e.abstract x)
+
+meta def expr.mk_lambdas (xs : list expr) (e : expr) : expr :=
+xs.foldr expr.mk_lambda e
+
+meta def expr.mk_pi (x e : expr) : expr :=
+expr.pi x.local_pp_name x.local_binding_info x.local_type (e.abstract x)
+
+meta def expr.mk_pis (xs : list expr) (e : expr) : expr :=
+xs.foldr expr.mk_pi e
 
 meta def expr.app' : expr → expr → expr
 | (expr.lam _ _ _ a) b := a.instantiate_var b
@@ -182,3 +202,21 @@ meta def tactic.classical : tactic unit :=
 do h ← get_unused_name `_inst,
    mk_const ``classical.prop_decidable >>= note h none,
    unfreeze_local_instances
+
+def list.m_any {α m} [monad m] (f : α → m bool) : list α → m bool
+| [] := pure ff
+| (x::xs) := do f_x ← f x, if f_x then pure tt else xs.m_any
+
+meta def mk_metas_core : list expr → tactic (list expr)
+| [] := pure []
+| (t::ts) := do
+  ms ← mk_metas_core ts,
+  m ← mk_meta_var (t.instantiate_vars ms),
+  pure (m::ms)
+
+meta def mk_locals_core : list expr → tactic (list expr)
+| [] := pure []
+| (t::ts) := do
+  lcs ← mk_locals_core ts,
+  lc ← mk_local' `h binder_info.default (t.instantiate_vars lcs),
+  pure (lc :: lcs)

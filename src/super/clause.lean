@@ -1,7 +1,7 @@
 import super.utils
 
 namespace super
-open tactic
+open tactic native
 
 @[derive decidable_eq]
 meta inductive literal
@@ -104,6 +104,12 @@ meta def instantiate_vars (es : list expr) : clause_type → clause_type
 | (imp a b) := imp (a.instantiate_vars es) b.instantiate_vars
 | (atom a) := atom (a.instantiate_vars es)
 
+meta def instantiate_univ_mvars (subst : rb_map name level) : clause_type → clause_type
+| ff := ff
+| (or a b) := or a.instantiate_univ_mvars b.instantiate_univ_mvars
+| (imp a b) := imp (a.instantiate_univ_mvars subst) b.instantiate_univ_mvars
+| (atom a) := atom (a.instantiate_univ_mvars subst)
+
 meta def pos_lits (ty : clause_type) : list expr :=
 do literal.pos l ← ty.literals | [], [l]
 
@@ -149,11 +155,17 @@ c.ty.num_literals
 meta def instantiate_mvars (cls : clause) : tactic clause :=
 clause.mk <$> cls.ty.instantiate_mvars <*> tactic.instantiate_mvars cls.prf
 
+meta def instantiate_univ_mvars (cls : clause) (subst : rb_map name level) : clause :=
+⟨cls.ty.instantiate_univ_mvars subst, cls.prf.instantiate_univ_mvars subst⟩
+
 meta def abstract_mvars (cls : clause) (mvars : list name) : clause :=
 { ty := cls.ty.abstract_mvars mvars, prf := cls.prf.abstract_mvars mvars }
 
 meta def abstract_mvars' (cls : clause) (mvars : list expr) : clause :=
 cls.abstract_mvars (mvars.map expr.meta_uniq_name)
+
+meta def instantiate_vars (cls : clause) (es : list expr) : clause :=
+⟨cls.ty.instantiate_vars es, cls.prf.instantiate_vars es⟩
 
 meta def is_taut (cls : clause) : bool :=
 cls.ty.is_taut
@@ -180,39 +192,65 @@ meta instance : has_to_string packed_clause := ⟨to_string ∘ packed_clause.cl
 meta instance : has_repr packed_clause := ⟨to_string⟩
 meta instance : has_to_tactic_format packed_clause := ⟨tactic.pp ∘ packed_clause.cls⟩
 
-private meta def unpack_mk_metas (ls_subst : rb_map name level) : list expr → tactic (list expr)
-| [] := pure []
-| (t::ts) := do
-  ms ← unpack_mk_metas ts,
-  m ← mk_meta_var ((t.instantiate_vars ms).instantiate_univ_mvars ls_subst),
-  pure (m::ms)
+meta def mk_metas (c : packed_clause) : tactic (list expr) :=
+mk_metas_core c.free_var_tys
+
+meta def mk_locals (c : packed_clause) : tactic (list expr) :=
+mk_locals_core c.free_var_tys
+
+meta def refresh_univ_mvars (c : packed_clause) : tactic packed_clause := do
+ls ← mk_num_meta_univs c.univ_mvars.length,
+let ls_subst := rb_map.of_list (c.univ_mvars.zip ls),
+pure {
+  univ_mvars := ls.map level.mvar_name,
+  free_var_tys := c.free_var_tys.map (λ t, t.instantiate_univ_mvars ls_subst),
+  cls := c.cls.instantiate_univ_mvars ls_subst
+}
 
 meta def unpack (c : packed_clause) : tactic clause := do
-ls ← mk_num_meta_univs c.univ_mvars.length,
-let ls_subst := rb_map.of_list (c.univ_mvars.zip ls),
-mvars ← unpack_mk_metas ls_subst c.free_var_tys,
-pure { ty := c.cls.ty.instantiate_vars mvars, prf := c.cls.prf.instantiate_vars mvars }
+c ← c.refresh_univ_mvars,
+mvars ← c.mk_metas,
+pure $ c.cls.instantiate_vars mvars
 
 meta def unpack_quantified (c : packed_clause) : tactic clause := do
-ls ← mk_num_meta_univs c.univ_mvars.length,
-let ls_subst := rb_map.of_list (c.univ_mvars.zip ls),
+c ← c.refresh_univ_mvars,
 let ty' := c.free_var_tys.foldr (expr.pi `h binder_info.default) c.cls.ty.to_expr,
 let prf' := c.free_var_tys.foldr (expr.lam `h binder_info.default) c.cls.prf,
-pure ⟨clause_type.atom (ty'.instantiate_univ_mvars ls_subst),
-  prf'.instantiate_univ_mvars ls_subst⟩
+pure ⟨clause_type.atom ty', prf'⟩
+
+meta def unpack_with_locals (c : packed_clause) : tactic clause := do
+c ← c.refresh_univ_mvars,
+lcs ← c.mk_locals,
+pure $ c.cls.instantiate_vars lcs
 
 end packed_clause
 
 meta def clause.pack (c : clause) : tactic packed_clause := do
 c ← c.instantiate_mvars,
 mvars ← c.prf.sorted_mvars,
+free_var_tys ← abstract_mvar_telescope mvars,
 pure {
   univ_mvars := c.prf.univ_meta_vars.to_list,
-  free_var_tys := mvars.map expr.meta_type,
+  free_var_tys := free_var_tys,
   cls := c.abstract_mvars' mvars,
 }
 
-meta def clause.clone (c : clause) :=
+meta def clause.clone (c : clause) : tactic clause :=
 pure c >>= clause.pack >>= packed_clause.unpack
+
+meta def clause.with_locals (c : clause) : tactic clause :=
+pure c >>= clause.pack >>= packed_clause.unpack_with_locals
+
+meta def clause.with_locals_unsafe (c : clause) : tactic clause := do
+mvars ← c.prf.sorted_mvars,
+lcs ← abstract_mvar_telescope mvars >>= mk_locals_core,
+(mvars.zip lcs).mmap' (λ x, unify x.1 x.2),
+c.instantiate_mvars
+
+-- -- set_option trace.type_context.is_def_eq true
+-- example (h : ∀ x, x > 0) : true := by do
+-- c ← get_local `h >>= clause.of_proof,
+-- c.with_locals_unsafe >>= trace,
+-- triv
 
 end super
