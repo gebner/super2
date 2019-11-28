@@ -220,3 +220,6 @@ meta def mk_locals_core : list expr → tactic (list expr)
   lcs ← mk_locals_core ts,
   lc ← mk_local' `h binder_info.default (t.instantiate_vars lcs),
   pure (lc :: lcs)
+
+@[pattern] meta def expr.const' (n : name) (ls : list level) : expr :=
+expr.const n ls

@@ -35,6 +35,10 @@ meta def formula : literal → expr
 | (neg f) := f
 | (pos f) := f
 
+meta def instantiate_mvars : literal → tactic literal
+| (neg f) := neg <$> tactic.instantiate_mvars f
+| (pos f) := pos <$> tactic.instantiate_mvars f
+
 end literal
 
 @[derive decidable_eq]

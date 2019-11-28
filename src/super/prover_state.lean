@@ -27,6 +27,12 @@ meta def clone (dc : derived_clause) : tactic derived_clause := do
 cls' ← dc.cls.clone,
 pure { cls := cls', ..dc }
 
+meta def selected_lits (dc : derived_clause) : list (literal × ℕ) := do
+let lits := dc.cls.literals,
+i ← dc.selected,
+some l ← pure (lits.nth i) | [],
+pure (l, i)
+
 end derived_clause
 
 meta structure prover_state :=

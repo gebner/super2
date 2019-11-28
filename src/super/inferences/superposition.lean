@@ -1,0 +1,137 @@
+import super.prover_state super.resolve
+
+namespace super
+open native tactic expr
+
+meta def clause.flip (c : clause) (i : ℕ) : clause :=
+match c.literals.nth i with
+| some (literal.pos e@(app (app (app (const ``eq [l]) ty) a) b)) :=
+  clause.resolve c i ⟨clause_type.imp e (clause_type.atom (const' ``eq [l] ty b a)),
+    const' ``eq.symm [l] ty a b⟩ 0
+| some (literal.neg e@(app (app (app (const ``eq [l]) ty) a) b)) :=
+  clause.resolve ⟨clause_type.imp (const' ``eq [l] ty b a) (clause_type.atom e),
+    const' ``eq.symm [l] ty b a⟩ 1 c i
+| _ := undefined_core $ "clause_flip " ++ to_string c ++ " " ++ to_string i
+end
+
+meta def clause.rewrite_in_ctx (ctx : expr) (ltr : bool)
+  (a : clause) (ai : ℕ) (b : clause) (bi : ℕ) : tactic clause := do
+let a := if ltr then a else a.flip ai,
+some (literal.pos eq_f@`(@eq %%ty %%l %%r)) ← pure $ a.literals.nth ai,
+some t ← pure $ b.literals.nth bi,
+let (l',r') := if t.is_pos then (l, r) else (r, l),
+prf_subst ←
+  if t.is_pos then
+    mk_mapp ``eq.subst [ty, ctx, l, r]
+  else
+    mk_mapp ``eq.substr [ty, ctx, r, l],
+let c_subst : clause :=
+  ⟨clause_type.imp eq_f (clause_type.imp (ctx.app' l')
+    (clause_type.atom (ctx.app' r'))),
+   prf_subst⟩,
+let a' := clause.resolve a ai c_subst 0,
+pure $ if t.is_pos then
+  clause.resolve b bi a' ai
+else
+  clause.resolve a' (ai + 1) b bi
+
+meta def clause.krewrite (ltr : bool)
+  (a : clause) (ai : ℕ) (b : clause) (bi : ℕ) : tactic (option clause) := do
+let a := if ltr then a else a.flip ai,
+some (literal.pos `(@eq %%ty %%l %%r)) ← pure $ a.literals.nth ai,
+some t ← pure $ b.literals.nth bi,
+ctx ← kabstract t.formula l transparency.reducible ff,
+if ¬ ctx.has_var then pure none else do
+let ctx := expr.lam `x binder_info.default ty ctx,
+pure <$> a.rewrite_in_ctx ctx tt ai b bi
+
+-- TODO: ignore at least dependent arguments
+private meta def closed_subterms (e : expr) : list expr :=
+rb_set.to_list $ e.fold mk_rb_set $ λ e i s,
+  match e with
+  | (expr.mvar _ _ _) := s
+  | _ := if e.has_var then s else s.insert e
+  end
+
+private meta def superposition_core (gt : term_order)
+  (a : derived_clause) (b : derived_clause) :
+  list (prover (list clause)) := do
+(literal.pos `(@eq %%ty %%l %%r), ai) ← a.selected_lits | [],
+(l,r, ltr) ← [(l,r,tt), (r,l,ff)],
+guard $ ¬ gt r l,
+(t, bi) ← b.selected_lits,
+st ← closed_subterms t.formula,
+pure $ do
+some () ← try_core (unify l st transparency.reducible) | pure [],
+l ← instantiate_mvars l,
+r ← instantiate_mvars r,
+guard $ ¬ gt r l,
+a ← a.cls.instantiate_mvars,
+b ← b.cls.instantiate_mvars,
+option.to_list <$> a.krewrite ltr ai b bi
+
+meta def inference.forward_superposition : inference_rule | given := do
+gt ← get_term_order,
+active ← get_active,
+retrieve_packed $ do
+act ← active.values,
+superposition_core gt act given
+
+meta def inference.backward_superposition : inference_rule | given := do
+gt ← get_term_order,
+active ← get_active,
+retrieve_packed $ do
+act ← active.values,
+superposition_core gt given act
+
+meta def inference.unify_eq : inference_rule | given :=
+retrieve_packed $ do
+(literal.neg `(%%l = %%r), i) ← given.cls.literals.zip_with_index | [],
+pure $ do
+some () ← try_core (unify l r) | pure [],
+rfl_prf ← mk_eq_refl l,
+pure $ pure $ given.cls.propg_pos i rfl_prf
+
+set_option trace.compiler.optimize_bytecode true
+
+meta def simplification.pos_refl : simplification_rule | cls :=
+if ∃ l ∈ cls.literals, ↑match l with
+    | (literal.pos `(%%a = %%b)) := (a = b : bool)
+    | _ := ff
+    end then
+  pure none
+else
+  pure cls
+
+meta def simplification.neg_refl : simplification_rule | cls :=
+first (do
+  (literal.neg `(%%a = %%b), i) ← cls.literals.zip_with_index | [],
+  pure $ do
+  is_def_eq a b,
+  rfl_prf ← mk_eq_refl a,
+  pure $ some $ cls.propg_pos i rfl_prf)
+<|> pure cls
+
+meta def preprocessing.pos_refl : preprocessing_rule :=
+simplification.pos_refl.as_preprocessing_rule
+
+meta def preprocessing.neg_refl : preprocessing_rule :=
+simplification.neg_refl.as_preprocessing_rule
+
+meta def simplification.flip_eq : simplification_rule | c := do
+gt ← get_term_order,
+pure $ pure $ c.literals.zip_with_index.foldl (λ c l,
+  match l.1.formula with
+  | e@`(@eq %%ty %%a %%b) :=
+    let e' := const' ``eq [] ty a b in
+    if gt e e' then
+      c.flip l.2
+    else
+      c
+  | _ := c
+  end) c
+
+meta def preprocessing.flip_eq : preprocessing_rule :=
+simplification.flip_eq.as_preprocessing_rule
+
+end super

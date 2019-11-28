@@ -1,7 +1,7 @@
 import super.prover_state super.selection
   super.inferences.distinct super.inferences.resolution
   super.inferences.clausify super.inferences.empty_clause
-  super.inferences.subsumption
+  super.inferences.subsumption super.inferences.superposition
 
 namespace super
 open native tactic
@@ -10,6 +10,10 @@ meta def default_preprocessing_rules : list preprocessing_rule :=
 [ preprocessing.empty_clause,
   preprocessing.distinct,
   preprocessing.clausify,
+  preprocessing.pos_refl,
+  preprocessing.neg_refl,
+  preprocessing.flip_eq,
+  preprocessing.distinct,
   preprocessing.subsumption_interreduction,
   preprocessing.forward_subsumption ]
 
@@ -17,7 +21,10 @@ meta def default_simplification_rules : list simplification_rule :=
 [ simplification.forward_subsumption ]
 
 meta def default_inference_rules : list inference_rule :=
-[ inference.resolution ]
+[ inference.resolution,
+  inference.forward_superposition,
+  inference.backward_superposition,
+  inference.unify_eq ]
 
 meta structure options :=
 (literal_selection : literal_selection_strategy := selection21)
@@ -111,6 +118,7 @@ open interactive
 open interactive.types
 open tactic
 
+-- TODO: show unused arguments
 meta def super (args : parse simp_arg_list)
                (opts : super.options := {}) : tactic unit := do
 cs ← _root_.super.clauses_of_simp_arg_type_list args,
@@ -128,4 +136,7 @@ by super *
 lemma bar (p : ℕ → Prop) : p 0 → (∀ x, p x → p (x + 1)) → p 10 :=
 by super
 
-#print foo
+lemma baz (a b c : ℕ) : a + (b + c) = (a + b) + c :=
+by super [add_assoc]
+
+#print baz
