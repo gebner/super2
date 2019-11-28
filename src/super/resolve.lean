@@ -9,8 +9,8 @@ meta def propg_pos : clause → ℕ → expr → clause
 | ⟨clause_type.atom _, _⟩ _ _ := undefined_core "propg_pos atom"
 | ⟨clause_type.imp a b, prf⟩ 0 h := ⟨b, prf.app' h⟩
 | ⟨clause_type.imp a b, prf⟩ (i+1) h :=
-  let ⟨b', prf'⟩ := propg_pos ⟨b, prf.lift_vars 0 1 (expr.var 0)⟩ i h in
-  ⟨clause_type.imp a b', expr.lam `h binder_info.default a prf'⟩
+  let ⟨b', prf'⟩ := propg_pos ⟨b, prf.lift_vars 0 1 (expr.var 0)⟩ i (h.lift_vars 0 1) in
+  ⟨clause_type.imp a b', expr.lam `h2 binder_info.default a prf'⟩
 | ⟨clause_type.or a b, prf⟩ i h :=
   let an := a.literals.length in
   if i < (an : ℕ) then
@@ -32,7 +32,7 @@ meta def propg_neg : clause → ℕ → clause → clause
 | ⟨clause_type.imp _ _, _⟩ 0 _ := undefined_core "propg_neg imp 0"
 | ⟨clause_type.imp a b, prf⟩ (i+1) h :=
   let ⟨b', prf'⟩ := propg_neg ⟨b, prf.lift_vars 0 1 (expr.var 0)⟩ i h in
-  ⟨clause_type.imp a b', expr.lam `h binder_info.default a prf'⟩
+  ⟨clause_type.imp a b', expr.lam `h1 binder_info.default a prf'⟩
 | ⟨clause_type.or a b, prf⟩ i h :=
   let an := a.literals.length in
   if i < (an : ℕ) then

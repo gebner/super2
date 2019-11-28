@@ -164,6 +164,9 @@ by cases classical.prop_decidable p; simp *
 @[simp] theorem and_imp {a b c} : (a ∧ b → c) ↔ (a → b → c) :=
 iff.intro (λ h ha hb, h ⟨ha, hb⟩) (λ h ⟨ha, hb⟩, h ha hb)
 
+theorem iff_imp {a b c} : ((a ↔ b) → c) ↔ ((a → b) → (b → a) → c) :=
+iff.intro (λ h ha hb, h ⟨ha, hb⟩) (λ h ⟨ha, hb⟩, h ha hb)
+
 theorem not.imp_symm {a b} (h : ¬a → b) (hb : ¬b) : a :=
 classical.by_contradiction $ hb ∘ h
 

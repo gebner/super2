@@ -101,14 +101,34 @@ initial ← (++ initial) <$> hs.mmap clause.of_proof,
 some empty_clause ← main opts initial | fail "saturation",
 exact empty_clause
 
+meta def eqn_lemma_clauses (n : name) : tactic (list clause) := do
+ls ← get_eqn_lemmas_for tt n,
+ls.mmap $ λ l, tactic.retrieve (mk_const l >>= clause.of_proof >>= clause.pack)
+                 >>= packed_clause.unpack
+
+meta def eqn_lemma_clauses_of_pexpr_name (n : name) : tactic (list clause) := do
+p ← resolve_name n,
+let e := p.erase_annotations.get_app_fn.erase_annotations,
+match e with
+| expr.const n _ := do
+ls ← get_eqn_lemmas_for tt n,
+ls.mmap $ λ l, tactic.retrieve (mk_const l >>= clause.of_proof >>= clause.pack)
+                 >>= packed_clause.unpack
+| _ := pure []
+end
+
+meta def eqn_lemma_clauses_of_pexpr : pexpr → tactic (list clause)
+| (expr.const n _) := eqn_lemma_clauses_of_pexpr_name n
+| (expr.local_const n _ _ _) := eqn_lemma_clauses_of_pexpr_name n
+| _ := pure []
+
 meta def clauses_of_simp_arg_type : simp_arg_type → tactic (list clause)
 | simp_arg_type.all_hyps := do lctx ← local_context, lctx.mmap clause.of_proof
 | (simp_arg_type.except _) := fail "super [-foo] not supported"
 | (simp_arg_type.expr e) := do
-  -- TODO: eqn lemmas
-  cls ← tactic.retrieve (to_expr e >>= clause.of_proof >>= clause.pack),
-  cls ← cls.unpack,
-  pure [cls]
+  eqn_lems ← eqn_lemma_clauses_of_pexpr e,
+  cls ← tactic.retrieve (to_expr e >>= clause.of_proof >>= clause.pack) >>= packed_clause.unpack,
+  pure (cls :: eqn_lems)
 
 meta def clauses_of_simp_arg_type_list (simp_args : list simp_arg_type) : tactic (list clause) :=
 list.join <$> simp_args.mmap clauses_of_simp_arg_type
