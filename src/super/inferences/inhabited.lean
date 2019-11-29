@@ -18,7 +18,6 @@ private meta def synth1_via_type_class (c : clause) : tactic clause :=
 first $ c.literals.zip_with_index.reverse.map $ λ ⟨l, i⟩, do
   guard $ l.is_neg ∨ c.ty.num_neg_literals ≠ 0 ∨ c.ty.num_pos_literals > 1,
   some inst ← synth_via_type_class l.formula,
-  trace inst,
   if l.is_pos then
     pure ⟨clause_type.atom l.formula, inst⟩
   else

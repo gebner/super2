@@ -5,9 +5,11 @@ namespace super
 meta def simplification.empty_clause : simplification_rule | c :=
 if c.ty.literals ≠ [] then pure (some c) else do
 c ← c.pack,
-some <$> c.unpack_quantified
+c ← c.unpack_quantified,
+some <$> clause.check_result_if_debug (pure c)
 
-meta def preprocessing.empty_clause : preprocessing_rule :=
-simplification.empty_clause.as_preprocessing_rule
+meta def preprocessing.empty_clause : preprocessing_rule | cs :=
+simplification.empty_clause.as_preprocessing_rule cs >>=
+  preprocessing.clausify
 
 end super

@@ -262,3 +262,5 @@ meta def tactic.on_exception {α} (handler : tactic unit) (tac : tactic α) : ta
   end
 | success := success
 end
+
+@[inline] instance has_monad_lift.refl {m} [monad m] : has_monad_lift m m := ⟨λ _, id⟩

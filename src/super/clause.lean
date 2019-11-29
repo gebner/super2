@@ -1,4 +1,4 @@
-import super.utils
+import super.utils super.debug
 
 namespace super
 open tactic native
@@ -193,6 +193,19 @@ when cls.ty.to_expr.has_var (fail $ to_fmt "type has de Bruijn variables"),
 type_check cls.prf,
 infer_type cls.prf >>= is_def_eq cls.ty.to_expr
 
+@[inline]
+meta def check_if_debug (cls : clause) : tactic unit :=
+when_debug cls.check
+
+@[inline]
+meta def check_result_if_debug {m} [monad m] [has_monad_lift tactic m] : m clause → m clause :=
+check_result_when_debug (monad_lift ∘ check)
+
+@[inline]
+meta def check_results_if_debug {m} [monad m] [has_monad_lift tactic m] :
+  m (list clause) → m (list clause) :=
+check_result_when_debug (λ cs, monad_lift $ cs.mmap' check)
+
 end clause
 
 @[derive decidable_eq]
@@ -263,11 +276,5 @@ mvars ← c.prf.sorted_mvars,
 lcs ← abstract_mvar_telescope mvars >>= mk_locals_core,
 (mvars.zip lcs).mmap' (λ x, unify x.1 x.2),
 c.instantiate_mvars
-
--- -- set_option trace.type_context.is_def_eq true
--- example (h : ∀ x, x > 0) : true := by do
--- c ← get_local `h >>= clause.of_proof,
--- c.with_locals_unsafe >>= trace,
--- triv
 
 end super

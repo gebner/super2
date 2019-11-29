@@ -26,12 +26,9 @@ private meta def congr (f : clause → tactic (list clause)) : clause → tactic
   cs ← f ⟨b, prf.app' pa⟩,
   pure $ cs.map $ λ ⟨b', prf'⟩, ⟨imp a b', pa.mk_lambda prf'⟩
 
-private meta def chk (f : clause → tactic (list clause)) (cls : clause) : tactic (list clause) :=
-trace cls.ty >>
-trace cls.prf >>
-cls.check >> f cls
-
 private meta def clausify_core : clause → tactic (list clause)
+| c := do c.check_if_debug, clause.check_results_if_debug $ match c with
+
 | c@⟨atom `(%%a ∧ %%b), prf⟩ :=
   list.join <$> list.mmap clausify_core
   [⟨atom a, `(@and.left %%a %%b %%prf)⟩, ⟨atom b, `(@and.right %%a %%b %%prf)⟩]
@@ -107,6 +104,7 @@ private meta def clausify_core : clause → tactic (list clause)
     `((@iff_imp %%a %%b %%c.to_expr).mp %%prf)⟩
 
 | c := congr clausify_core c
+end
 
 meta def clause.clausify (c : clause) : tactic (list clause) := do
 cs ← clausify_core c,
@@ -143,17 +141,5 @@ meta def clause_type.is_clausified : clause_type → bool
 
 meta def clause.is_clausified (c : clause) : bool :=
 c.ty.is_clausified
-
--- set_option trace.check true
--- set_option trace.app_builder true
--- example (a b c) (h : b ∨ a → a ∨ a → (∃ m, m > 10 → c) → a ∧ b ∧ ∃ n, n > 0) : true := by do
--- h ← get_local `h,
--- c ← clause.of_proof h,
--- trace c,
--- cs ← c.clausify,
--- trace cs,
--- trace $ cs.map (λ c, c.prf),
--- cs.mmap $ λ c, c.check,
--- triv
 
 end super

@@ -107,7 +107,7 @@ put { state with clause_counter := state.clause_counter + 1 },
 return state.clause_counter
 
 meta def add_passive (strat : literal_selection_strategy) (c : clause) : prover clause_id := do
-c.check,
+c.check_if_debug,
 id ← get_new_cls_id,
 register_consts_in_precedence (contained_funsyms c.ty.to_expr).to_list, -- TODO: rethink this
 dc ← strat { id := id, cls := c, selected := [] },
@@ -118,8 +118,9 @@ meta def preprocessing_rule := list clause → prover (list clause)
 
 meta def simplification_rule := clause → prover (option clause)
 
+@[inline]
 meta def simplification_rule.as_preprocessing_rule (r : simplification_rule) : preprocessing_rule :=
-λ cs, list.join <$> cs.mmap (λ c, option.to_list <$> r c)
+λ cs, list.join <$> cs.mmap (λ c, clause.check_results_if_debug $ option.to_list <$> r c)
 
 meta def inference_rule := derived_clause → prover (list clause)
 
@@ -128,6 +129,6 @@ do s ← get, ↑(tactic.retrieve $ prod.fst <$> p.run s)
 
 meta def retrieve_packed (ps : list (prover (list clause))) : prover (list clause) :=
 (list.join <$> monad.sequence (do p ← ps, pure $ retrieve $ p >>= list.mmap (λ c, c.pack)))
->>= list.mmap (λ c : packed_clause, c.unpack)
+  >>= list.mmap (λ c : packed_clause, clause.check_result_if_debug c.unpack)
 
 end super
