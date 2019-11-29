@@ -42,7 +42,7 @@ private meta def clausify_core : clause → tactic (list clause)
 | c@⟨atom (expr.pi n bi t a), prf⟩ :=
   if a.has_var then do
     m ← mk_meta_var t,
-    clausify_core ⟨atom a, prf.app' m⟩
+    clausify_core ⟨atom (a.instantiate_var m), prf.app' m⟩
   else
     clausify_core ⟨imp t (atom a), prf⟩
 | c@⟨atom `(%%a ∨ %%b), prf⟩ :=
@@ -57,7 +57,7 @@ private meta def clausify_core : clause → tactic (list clause)
   clausify_core ⟨atom (p.app' sk_term), prf'⟩
 | c@⟨atom `(@eq Prop %%a %%b), prf⟩ := do
   prf' ← mk_mapp ``eq.to_iff [a, b, prf],
-  chk clausify_core ⟨atom `(%%a ↔ %%b), prf'⟩
+  clausify_core ⟨atom `(%%a ↔ %%b), prf'⟩
 | ⟨atom `(false), prf⟩ := pure [⟨ff, prf⟩]
 | ⟨atom `(true), prf⟩ := pure []
 
@@ -74,14 +74,16 @@ private meta def clausify_core : clause → tactic (list clause)
   clausify_core ⟨imp (p.app' witness) b, prf'⟩
 | c@⟨imp (expr.pi n bi a b) d, prf⟩ := do
   a_prop ← is_prop a,
-  b_prop ← is_prop b,
+  ha ← mk_local_hyp a,
+  b_prop ← is_prop (b.instantiate_var ha),
   if b.has_var ∧ b_prop then do
     m ← mk_meta_var a,
     let p := expr.lam n bi a b,
-    b' ← mk_mapp ``Exists [a, p],
+    x ← mk_local' `x binder_info.default a,
+    b' ← mk_mapp ``Exists [a, x.mk_lambda `(¬ %%(p.app' x))],
     prf' ← mk_mapp ``classical.forall_imp_iff_exists_not_or [a, p, d.to_expr],
     prf' ← mk_mapp ``iff.mp [none, none, prf', prf],
-    clausify_core ⟨or (imp b' ff) d, prf'⟩
+    clausify_core ⟨or (atom b') d, prf'⟩
   else if ¬ b.has_var ∧ a_prop ∧ b_prop then do
     let prf_or_not_imp := `((@imp_iff_or_not %%a %%b).mpr),
     prf' ← mk_mapp ``function.comp [none, none, none, prf, prf_or_not_imp],
@@ -99,17 +101,17 @@ private meta def clausify_core : clause → tactic (list clause)
 | ⟨imp `(@eq Prop %%a %%b) c, prf⟩ := do
   prf' ← mk_mapp ``propext [a, b],
   prf' ← mk_mapp ``function.comp [none, none, none, prf, prf'],
-  chk clausify_core ⟨imp `(%%a ↔ %%b) c, prf'⟩
+  clausify_core ⟨imp `(%%a ↔ %%b) c, prf'⟩
 | ⟨imp `(%%a ↔ %%b) c, prf⟩ :=
-  chk clausify_core ⟨imp (a.imp b) (imp (b.imp a) c),
+  clausify_core ⟨imp (a.imp b) (imp (b.imp a) c),
     `((@iff_imp %%a %%b %%c.to_expr).mp %%prf)⟩
 
 | c := congr clausify_core c
 
 meta def clause.clausify (c : clause) : tactic (list clause) := do
 cs ← clausify_core c,
-let cs := cs.map clause.distinct,
 let cs := cs.filter (λ c, ¬ c.is_taut),
+let cs := cs.map clause.distinct,
 let cs := cs.dup_by_native (λ c, c.ty.to_expr),
 pure cs
 
