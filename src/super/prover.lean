@@ -17,7 +17,8 @@ meta def default_preprocessing_rules : list preprocessing_rule :=
   preprocessing.flip_eq,
   preprocessing.distinct,
   preprocessing.subsumption_interreduction,
-  preprocessing.forward_subsumption ]
+  preprocessing.forward_subsumption,
+  preprocessing.empty_clause ]
 
 meta def default_simplification_rules : list simplification_rule :=
 [ simplification.forward_subsumption ]
@@ -49,7 +50,16 @@ meta def do_preprocessing (opts : options)
   (newly_derived : list clause) : prover (list clause) :=
 opts.preproc_rules.mfoldl (λ cls pr, pr cls) newly_derived
 
-meta def main_loop (opts : options) : ℕ → prover (option expr) | n := do
+meta def main_loop (opts : options) : list clause → ℕ → prover (option expr) | newly_derived n := do
+newly_derived ← do_preprocessing opts newly_derived,
+let derived_empty_clauses := newly_derived.filter (λ c, c.ty.literals = []),
+match derived_empty_clauses with
+| (c::_) := do
+  c ← c.instantiate_mvars,
+  c.check,
+  pure c.prf
+| _ := do
+newly_derived.mmap' (add_passive opts.literal_selection),
 passive_size ← rb_map.size <$> get_passive,
 if passive_size = 0 then
   do act ← get_active, tactic.trace act.values,
@@ -59,29 +69,19 @@ else do
   given ← consume_passive given_id,
   given ← do_simplification opts given,
   match given with
+  | none := main_loop [] (n+1)
   | some given := do
     add_active given,
     trace given,
     given' ← given.clone,
     newly_derived ← list.join <$> opts.inf_rules.mmap (λ ir, ir given'),
-    newly_derived ← do_preprocessing opts newly_derived,
-    let derived_empty_clauses := newly_derived.filter (λ c, c.ty.literals = []),
-    match derived_empty_clauses with
-    | (c::_) := pure c.prf
-    | _ := do
-      newly_derived.mmap' (add_passive opts.literal_selection),
-      main_loop (n+1)
-    end
-  | none := main_loop (n+1)
+    main_loop newly_derived (n+1)
   end
+end
 
 meta def main (opts : options) (initial : list clause) : tactic (option expr) := do
 initial ← initial.mmap clause.clone, -- work around local context restriction
-prod.fst <$> state_t.run (do
-    initial ← do_preprocessing opts initial,
-    initial.mmap' (add_passive opts.literal_selection),
-    main_loop opts 0)
-  prover_state.initial
+prod.fst <$> state_t.run (main_loop opts initial 0) prover_state.initial
 
 meta def solve (opts : options) (initial : list clause) : tactic unit := do
 some empty_clause ← main opts initial | fail "saturation",
