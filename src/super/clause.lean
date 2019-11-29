@@ -186,10 +186,10 @@ meta def instantiate_vars (cls : clause) (es : list expr) : clause :=
 meta def is_taut (cls : clause) : bool :=
 cls.ty.is_taut
 
-meta def check (cls : clause) : tactic unit := do
-when cls.prf.has_var (do prf ← pp cls.prf, fail $ to_fmt "proof has de Bruijn variables: " ++ prf),
-when cls.ty.to_expr.has_var
-  (do ty ← pp cls.ty, fail $ to_fmt "type has de Bruijn variables: " ++ ty),
+meta def check (cls : clause) : tactic unit :=
+on_exception (do trace "\n", trace cls.prf, trace cls.ty, trace_call_stack) $ do
+when cls.prf.has_var (fail $ to_fmt "proof has de Bruijn variables"),
+when cls.ty.to_expr.has_var (fail $ to_fmt "type has de Bruijn variables"),
 type_check cls.prf,
 infer_type cls.prf >>= is_def_eq cls.ty.to_expr
 
