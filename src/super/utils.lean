@@ -74,7 +74,7 @@ private meta def sorted_mvars_core : list expr → list expr → tactic (list ex
   if ∃ m ∈ ctx, (m : expr).meta_uniq_name = e.meta_uniq_name then
     sorted_mvars_core es ctx
   else do
-    t ← infer_type e,
+    t ← infer_type e >>= instantiate_mvars,
     ctx ← sorted_mvars_core t.meta_vars.to_list ctx,
     sorted_mvars_core es (e :: ctx)
 | [] ctx := pure ctx
@@ -89,7 +89,7 @@ expr.sorted_mvars' [e]
 meta def abstract_mvar_telescope : list expr → tactic (list expr)
 | [] := pure []
 | (m :: ms) := do
-  t ← infer_type m,
+  t ← infer_type m >>= instantiate_mvars,
   ms' ← abstract_mvar_telescope ms,
   pure $ t.abstract_mvars' ms :: ms'
 
