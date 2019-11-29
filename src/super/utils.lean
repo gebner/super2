@@ -218,11 +218,26 @@ meta def mk_metas_core : list expr → tactic (list expr)
   m ← mk_meta_var (t.instantiate_vars ms),
   pure (m::ms)
 
+meta def expr.name_hint : expr → option name
+| (expr.const n _) := n
+| (expr.app a b) := a.name_hint <|> b.name_hint
+| (expr.pi pp_n _ a b) := b.name_hint <|> a.name_hint <|> pp_n
+| (expr.lam pp_n _ a b) := b.name_hint <|> pp_n
+| (expr.sort _) := `type
+| (expr.local_const _ pp_n _ _) := pp_n
+| _ := name.anonymous
+
+meta def expr.hyp_name_hint (e : expr) : name :=
+match e.name_hint with
+| some (name.mk_string s _) := ("h_" ++ s : string)
+| _ := `h
+end
+
 meta def mk_locals_core : list expr → tactic (list expr)
 | [] := pure []
 | (t::ts) := do
   lcs ← mk_locals_core ts,
-  lc ← mk_local' `h binder_info.default (t.instantiate_vars lcs),
+  lc ← mk_local' t.hyp_name_hint binder_info.default (t.instantiate_vars lcs),
   pure (lc :: lcs)
 
 @[pattern] meta def expr.const' (n : name) (ls : list level) : expr :=

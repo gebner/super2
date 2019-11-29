@@ -10,19 +10,19 @@ meta def propg_pos : clause → ℕ → expr → clause
 | ⟨clause_type.imp a b, prf⟩ 0 h := ⟨b, prf.app' h⟩
 | ⟨clause_type.imp a b, prf⟩ (i+1) h :=
   let ⟨b', prf'⟩ := propg_pos ⟨b, prf.lift_vars 0 1 (expr.var 0)⟩ i (h.lift_vars 0 1) in
-  ⟨clause_type.imp a b', expr.lam `h2 binder_info.default a prf'⟩
+  ⟨clause_type.imp a b', expr.lam a.hyp_name_hint binder_info.default a prf'⟩
 | ⟨clause_type.or a b, prf⟩ i h :=
   let an := a.literals.length in
   if i < (an : ℕ) then
-    let ⟨a', prf'⟩ := propg_pos ⟨a, expr.var 0⟩ i h in
+    let ⟨a', prf'⟩ := propg_pos ⟨a, expr.var 0⟩ i (h.lift_vars 0 1) in
     ⟨clause_type.or a' b,
      `(@or_imp_congr_left %%b.to_expr %%a.to_expr %%a'.to_expr
-        %%(expr.lam `h binder_info.default a.to_expr prf'))⟩
+        %%(expr.lam a.to_expr.hyp_name_hint binder_info.default a.to_expr prf') %%prf)⟩
   else
-    let ⟨b', prf'⟩ := propg_pos ⟨b, expr.var 0⟩ (i - an) h in
+    let ⟨b', prf'⟩ := propg_pos ⟨b, expr.var 0⟩ (i - an) (h.lift_vars 0 1) in
     ⟨clause_type.or a b',
      `(@or_imp_congr_right %%a.to_expr %%b.to_expr %%b'.to_expr
-        %%(expr.lam `h binder_info.default b.to_expr prf'))⟩
+        %%(expr.lam b.to_expr.hyp_name_hint binder_info.default b.to_expr prf') %%prf)⟩
 
 meta def propg_neg : clause → ℕ → clause → clause
 | ⟨clause_type.ff, _⟩ _ _ := undefined_core "propg_neg ff"
@@ -31,20 +31,20 @@ meta def propg_neg : clause → ℕ → clause → clause
   ⟨hty, hprf.instantiate_var prf⟩
 | ⟨clause_type.imp _ _, _⟩ 0 _ := undefined_core "propg_neg imp 0"
 | ⟨clause_type.imp a b, prf⟩ (i+1) h :=
-  let ⟨b', prf'⟩ := propg_neg ⟨b, prf.lift_vars 0 1 (expr.var 0)⟩ i h in
-  ⟨clause_type.imp a b', expr.lam `h1 binder_info.default a prf'⟩
+  let ⟨b', prf'⟩ := propg_neg ⟨b, (prf.lift_vars 0 1).app' (expr.var 0)⟩ i h in
+  ⟨clause_type.imp a b', expr.lam a.hyp_name_hint binder_info.default a prf'⟩
 | ⟨clause_type.or a b, prf⟩ i h :=
   let an := a.literals.length in
   if i < (an : ℕ) then
     let ⟨a', prf'⟩ := propg_neg ⟨a, expr.var 0⟩ i h in
     ⟨clause_type.or a' b,
      `(@or_imp_congr_left %%b.to_expr %%a.to_expr %%a'.to_expr
-        %%(expr.lam `h binder_info.default a.to_expr prf'))⟩
+        %%(expr.lam a.to_expr.hyp_name_hint binder_info.default a.to_expr prf') %%prf)⟩
   else
     let ⟨b', prf'⟩ := propg_neg ⟨b, expr.var 0⟩ (i - an) h in
     ⟨clause_type.or a b',
      `(@or_imp_congr_right %%a.to_expr %%b.to_expr %%b'.to_expr
-        %%(expr.lam `h binder_info.default b.to_expr prf'))⟩
+        %%(expr.lam b.to_expr.hyp_name_hint binder_info.default b.to_expr prf') %%prf)⟩
 
 meta def resolve (a : clause) (ai : ℕ) (b : clause) (bi : ℕ) : clause :=
 propg_neg a ai (propg_pos b bi (expr.var 0))

@@ -5,7 +5,7 @@ namespace super
 open clause_type tactic
 
 meta def mk_local_hyp (type : expr) : tactic expr :=
-mk_local' `h binder_info.default type
+mk_local' type.hyp_name_hint binder_info.default type
 
 meta def mk_c (n : name) : expr :=
 expr.const n []

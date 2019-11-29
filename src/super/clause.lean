@@ -231,8 +231,8 @@ pure $ c.cls.instantiate_vars mvars
 
 meta def unpack_quantified (c : packed_clause) : tactic clause := do
 c ← c.refresh_univ_mvars,
-let ty' := c.free_var_tys.foldr (expr.pi `h binder_info.default) c.cls.ty.to_expr,
-let prf' := c.free_var_tys.foldr (expr.lam `h binder_info.default) c.cls.prf,
+let ty' := c.free_var_tys.foldl (λ e x, expr.pi x.hyp_name_hint binder_info.default x e) c.cls.ty.to_expr,
+let prf' := c.free_var_tys.foldl (λ e x, expr.lam x.hyp_name_hint binder_info.default x e) c.cls.prf,
 pure ⟨clause_type.atom ty', prf'⟩
 
 meta def unpack_with_locals (c : packed_clause) : tactic clause := do

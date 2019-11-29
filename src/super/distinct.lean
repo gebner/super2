@@ -32,8 +32,8 @@ private meta def distinct_core : clause → list literal → clause
   | some i := distinct_core ⟨b, prf (expr.var i)⟩ ctx
   | none :=
     let ⟨b', prf'⟩ :=
-      distinct_core ⟨b, prf.lift_vars 0 1 (expr.var 0)⟩ (literal.neg a :: ctx) in
-    ⟨clause_type.imp a b', expr.lam `h binder_info.default a prf'⟩
+      distinct_core ⟨b, (prf.lift_vars 0 1).app' (expr.var 0)⟩ (literal.neg a :: ctx) in
+    ⟨clause_type.imp a b', expr.lam a.hyp_name_hint binder_info.default a prf'⟩
   end
 | c@⟨clause_type.atom a, prf⟩ ctx :=
   match ctx.index_of' (literal.pos a) with
@@ -50,8 +50,8 @@ private meta def distinct_core : clause → list literal → clause
     let ⟨b', prfb'⟩ := distinct_core ⟨b, expr.var 0⟩ (literal.neg b.to_expr :: ctx) in
     let res : clause := ⟨clause_type.or a' b',
     `(@or_imp_congr %%a.to_expr %%a'.to_expr %%b.to_expr %%b'.to_expr
-      %%(expr.lam `h binder_info.default a.to_expr prfa')
-      %%(expr.lam `h binder_info.default b.to_expr prfb')
+      %%(expr.lam a.to_expr.hyp_name_hint binder_info.default a.to_expr prfa')
+      %%(expr.lam b.to_expr.hyp_name_hint binder_info.default b.to_expr prfb')
       %%prf)⟩ in
     if res.is_or_ff_clean then res else distinct_core res ctx
   else
@@ -64,8 +64,8 @@ private meta def distinct_core : clause → list literal → clause
         (literal.neg b.to_expr :: literal.pos a :: ctx) in
       let res : clause := ⟨clause_type.or (clause_type.atom a) b',
         `(@or_imp_congr_right_strong %%a %%b.to_expr %%b'.to_expr
-          %%(expr.lam `h binder_info.default a $
-            expr.lam `h binder_info.default b.to_expr prf')
+          %%(expr.lam a.hyp_name_hint binder_info.default `(¬ %%a) $
+            expr.lam b.to_expr.hyp_name_hint binder_info.default b.to_expr prf')
           %%prf)⟩ in
       if res.is_or_ff_clean then res else distinct_core res ctx
     | clause_type.ff := undefined_core "distinct_core ff"
