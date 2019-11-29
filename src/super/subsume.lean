@@ -21,8 +21,13 @@ guard $
 guard $
   (small.literals.filter (λ l : literal, l.is_neg)).length ≤
   (large.literals.filter (λ l : literal, l.is_neg)).length,
+let large0 := large,
 large ← large.with_locals_unsafe,
-try_subsume_core small.literals large.literals
+try_subsume_core small.literals large.literals,
+small_mvars ← small.prf.sorted_mvars,
+large_mvars ← large0.prf.sorted_mvars,
+small_mvars.mmap' $ λ sm, first $
+  do lm ← large_mvars, pure $ unify sm lm transparency.reducible
 
 meta def does_subsume_pure (s : tactic_state) (small large : clause) : bool :=
 match try_subsume small large s with
