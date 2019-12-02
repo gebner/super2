@@ -10,6 +10,6 @@ lemma bar (p : ℕ → Prop) : p 0 → (∀ x, p x → p (x + 1)) → p 10 :=
 by super
 
 lemma baz (a b c : ℕ) : a + (b + c) = (a + b) + c :=
-by tactic.try_for 40000 `[super [add_assoc, add_zero, add_comm]]
+by super [add_assoc, add_zero, add_comm]
 
 #print baz

@@ -114,6 +114,12 @@ meta def abstract_mvars (mvars : list name) : clause_type → clause_type
 | (imp a b) := imp (a.abstract_mvars mvars) b.abstract_mvars
 | (atom a) := atom (a.abstract_mvars mvars)
 
+meta def abstract_locals (locals : list name) : clause_type → clause_type
+| ff := ff
+| (or a b) := or a.abstract_locals b.abstract_locals
+| (imp a b) := imp (a.abstract_locals locals) b.abstract_locals
+| (atom a) := atom (a.abstract_locals locals)
+
 meta def instantiate_vars (es : list expr) : clause_type → clause_type
 | ff := ff
 | (or a b) := or a.instantiate_vars b.instantiate_vars
@@ -125,6 +131,12 @@ meta def instantiate_univ_mvars (subst : rb_map name level) : clause_type → cl
 | (or a b) := or a.instantiate_univ_mvars b.instantiate_univ_mvars
 | (imp a b) := imp (a.instantiate_univ_mvars subst) b.instantiate_univ_mvars
 | (atom a) := atom (a.instantiate_univ_mvars subst)
+
+meta def instantiate_univ_params (subst : list (name × level)) : clause_type → clause_type
+| ff := ff
+| (or a b) := or a.instantiate_univ_params b.instantiate_univ_params
+| (imp a b) := imp (a.instantiate_univ_params subst) b.instantiate_univ_params
+| (atom a) := atom (a.instantiate_univ_params subst)
 
 meta def pos_lits (ty : clause_type) : list expr :=
 do literal.pos l ← ty.literals | [], [l]
@@ -175,11 +187,17 @@ clause.mk <$> cls.ty.instantiate_mvars <*> tactic.instantiate_mvars cls.prf
 meta def instantiate_univ_mvars (cls : clause) (subst : rb_map name level) : clause :=
 ⟨cls.ty.instantiate_univ_mvars subst, cls.prf.instantiate_univ_mvars subst⟩
 
+meta def instantiate_univ_params (cls : clause) (subst : list (name × level)) : clause :=
+⟨cls.ty.instantiate_univ_params subst, cls.prf.instantiate_univ_params subst⟩
+
 meta def abstract_mvars (cls : clause) (mvars : list name) : clause :=
 { ty := cls.ty.abstract_mvars mvars, prf := cls.prf.abstract_mvars mvars }
 
 meta def abstract_mvars' (cls : clause) (mvars : list expr) : clause :=
 cls.abstract_mvars (mvars.map expr.meta_uniq_name)
+
+meta def abstract_locals (cls : clause) (locals : list name) : clause :=
+⟨cls.ty.abstract_locals locals, cls.prf.abstract_locals locals⟩
 
 meta def instantiate_vars (cls : clause) (es : list expr) : clause :=
 ⟨cls.ty.instantiate_vars es, cls.prf.instantiate_vars es⟩

@@ -47,7 +47,7 @@ let ctx := expr.lam `x binder_info.default ty ctx,
 pure <$> a.rewrite_in_ctx ctx tt ai b bi
 
 -- TODO: ignore at least dependent arguments
-private meta def closed_subterms (e : expr) : list expr :=
+meta def closed_subterms (e : expr) : list expr :=
 rb_set.to_list $ e.fold mk_rb_set $ λ e i s,
   match e with
   | (expr.mvar _ _ _) := s
@@ -117,12 +117,13 @@ simplification.pos_refl.as_preprocessing_rule
 meta def preprocessing.neg_refl : preprocessing_rule :=
 simplification.neg_refl.as_preprocessing_rule
 
+open expr
 meta def simplification.flip_eq : simplification_rule | c := do
 gt ← get_term_order,
 pure $ pure $ c.literals.zip_with_index.foldl (λ c l,
   match l.1.formula with
-  | e@`(@eq %%ty %%a %%b) :=
-    let e' := const' ``eq [] ty a b in
+  | e@(app (app (app (const ``eq [lvl]) ty) a) b) :=
+    let e' := const' ``eq [lvl] ty b a in
     if gt e e' then
       c.flip l.2
     else

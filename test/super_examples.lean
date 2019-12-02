@@ -83,3 +83,6 @@ example (person) [nonempty person] (drinks : person → Prop) :
 
 example {p q : ℕ → Prop} {r} : (∀x y, p x ∧ q y ∧ r) -> ∀x, (p x ∧ r ∧ q x) :=
 by super
+
+example {α} [add_group α] (x : α) : 0 + 0 + x + 0 + 0 + 0 = x :=
+by super [add_zero, zero_add]

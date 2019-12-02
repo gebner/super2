@@ -3,6 +3,7 @@ import super.prover_state super.selection
   super.inferences.clausify super.inferences.empty_clause
   super.inferences.subsumption super.inferences.superposition
   super.inferences.factoring super.inferences.inhabited
+  super.inferences.demod
 
 namespace super
 open native tactic
@@ -21,7 +22,10 @@ meta def default_preprocessing_rules : list preprocessing_rule :=
   preprocessing.empty_clause ]
 
 meta def default_simplification_rules : list simplification_rule :=
-[ simplification.forward_subsumption ]
+[ simplification.forward_demod,
+  simplification.pos_refl,
+  simplification.neg_refl,
+  simplification.forward_subsumption ]
 
 meta def default_inference_rules : list inference_rule :=
 [ inference.backward_subsumption,
@@ -74,6 +78,7 @@ else do
   match given with
   | none := main_loop [] (n+1)
   | some given := do
+    if given.cls.literals = [] then main_loop [given.cls] (n+1) else do
     when (is_trace_enabled_for `super)
       (do act ← get_active,
           given ← pp given,
