@@ -15,12 +15,8 @@ private meta def try_subsume_core : list literal → list literal → tactic uni
     try_subsume_core small (large.remove_nth j.2)
 
 private meta def try_subsume (small large : clause) : tactic unit := do
-guard $
-  (small.literals.filter (λ l : literal, l.is_pos)).length ≤
-  (large.literals.filter (λ l : literal, l.is_pos)).length,
-guard $
-  (small.literals.filter (λ l : literal, l.is_neg)).length ≤
-  (large.literals.filter (λ l : literal, l.is_neg)).length,
+guard $ small.ty.num_neg_literals ≤ large.ty.num_neg_literals,
+guard $ small.ty.num_pos_literals ≤ large.ty.num_pos_literals,
 let large0 := large,
 large ← large.with_locals_unsafe,
 try_subsume_core small.literals large.literals,
