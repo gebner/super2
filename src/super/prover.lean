@@ -180,14 +180,3 @@ cs ← _root_.super.clauses_of_simp_arg_type_list args,
 _root_.super.solve_with_goal opts cs
 
 end tactic.interactive
-
-lemma foo (p : ℕ → Prop) (h1 : ∀ x, ¬ p x) : ∃ x, ¬ p (x + 1) :=
-by super *
-
-lemma bar (p : ℕ → Prop) : p 0 → (∀ x, p x → p (x + 1)) → p 10 :=
-by super
-
-lemma baz (a b c : ℕ) : a + (b + c) = (a + b) + c :=
-by super [add_assoc, add_zero, add_comm]
-
-#print baz

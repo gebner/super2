@@ -1,6 +1,9 @@
 import super
 open tactic
 
+set_option trace.super true
+set_option profiler true
+
 def prime (n : ℕ) := ∀ d, d ∣ n → d = 1 ∨ d = n
 
 set_option trace.check true
@@ -68,14 +71,6 @@ by super *
 example (i) (c : i) (p : i → Prop) (f g : i → i) :
 p c → (∀x, p x → p (f x)) → (∀x, p x → f x = g x) → f (f c) = g (g c) :=
 by super
-
-example (i) (p q : i → i → Prop) (a b c d : i) :
-  (∀x y z, p x y ∧ p y z → p x z) →
-  (∀x y z, q x y ∧ q y z → q x z) →
-  (∀x y, q x y → q y x) →
-  (∀x y, p x y ∨ q x y) →
-  p a b ∨ q c d :=
-by super *
 
 -- This example from Davis-Putnam actually requires a non-empty domain
 
