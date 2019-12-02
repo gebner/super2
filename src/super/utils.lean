@@ -277,3 +277,8 @@ target >>= instantiate_mvars >>= change
 def list.find {α} {p} [decidable_pred p] : list α → option α
 | [] := none
 | (x::xs) := if p x then x else xs.find
+
+-- decidable instance for bounded existence is not short-circuiting?!?
+def list.existsb {α} (p : α → bool) : list α → bool
+| [] := ff
+| (x :: xs) := if p x then tt else xs.existsb

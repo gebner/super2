@@ -94,8 +94,8 @@ rfl_prf ← mk_eq_refl l,
 pure $ pure $ given.cls.propg_pos i rfl_prf
 
 meta def simplification.pos_refl : simplification_rule | cls :=
-if ∃ l ∈ cls.literals, ↑match l with
-    | (literal.pos `(%%a = %%b)) := (a = b : bool)
+if cls.literals.existsb $ λ l, match l with
+    | (literal.pos `(%%a = %%b)) := a = b
     | _ := ff
     end then
   pure none

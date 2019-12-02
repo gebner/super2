@@ -5,7 +5,7 @@ namespace super
 meta def simplification.forward_subsumption : simplification_rule | given := do
 active ← get_active,
 s ← tactic.read,
-if ∃ act ∈ active.values, does_subsume_pure s (act : derived_clause).cls given then
+if active.values.existsb $ λ act : derived_clause, does_subsume_pure s act.cls given then
   pure none
 else
   pure given
@@ -18,7 +18,7 @@ private meta def interreduce {α} (subsumes : α → α → bool) : list α → 
 | (x :: ys) :=
   let ys := ys.filter (λ y, ¬ subsumes x y),
       ys := interreduce ys in
-  if ∃ y ∈ ys, subsumes y x then ys else x :: ys
+  if ys.existsb (λ y, subsumes y x) then ys else x :: ys
 
 meta def preprocessing.subsumption_interreduction : preprocessing_rule | cs := do
 s ← tactic.read,
