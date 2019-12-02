@@ -84,7 +84,7 @@ initial ← initial.mmap clause.clone, -- work around local context restriction
 prod.fst <$> state_t.run (main_loop opts initial 0) prover_state.initial
 
 meta def with_ground_mvars {α} (tac : tactic α) : tactic α := do
-reverted_goal ← tactic.retrieve (revert_all >> target),
+reverted_goal ← tactic.retrieve (unfreeze_local_instances >> revert_all >> target),
 reverted_goal ← instantiate_mvars reverted_goal,
 mvars ← reverted_goal.sorted_mvars,
 lcs ← mk_locals_core mvars,
