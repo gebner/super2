@@ -51,6 +51,8 @@ meta def do_preprocessing (opts : options)
   (newly_derived : list clause) : prover (list clause) :=
 opts.preproc_rules.mfoldl (λ cls pr, pr cls) newly_derived
 
+declare_trace super
+
 meta def main_loop (opts : options) : list clause → ℕ → prover (option expr) | newly_derived n := do
 newly_derived ← do_preprocessing opts newly_derived,
 let derived_empty_clauses := newly_derived.filter (λ c, c.ty.literals = []),
@@ -72,8 +74,13 @@ else do
   match given with
   | none := main_loop [] (n+1)
   | some given := do
+    when (is_trace_enabled_for `super)
+      (do act ← get_active,
+          given ← pp given,
+          trace $ "[a=" ++ to_string act.size ++
+                  ",p=" ++ to_string passive_size ++
+                  "] " ++ to_string given),
     add_active given,
-    trace given,
     given' ← given.clone,
     newly_derived ← list.join <$> opts.inf_rules.mmap (λ ir, ir given'),
     main_loop newly_derived (n+1)
