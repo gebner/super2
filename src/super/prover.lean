@@ -29,6 +29,7 @@ meta def default_simplification_rules : list simplification_rule :=
 
 meta def default_inference_rules : list inference_rule :=
 [ inference.backward_subsumption,
+  inference.backward_demod,
   inference.resolution,
   inference.factoring,
   inference.forward_superposition,
