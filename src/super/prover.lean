@@ -17,7 +17,7 @@ meta def default_preprocessing_rules : list preprocessing_rule :=
   preprocessing.flip_eq,
   preprocessing.distinct,
   preprocessing.subsumption_interreduction,
-  preprocessing.forward_subsumption,
+  -- preprocessing.forward_subsumption,
   preprocessing.empty_clause ]
 
 meta def default_simplification_rules : list simplification_rule :=
