@@ -114,6 +114,9 @@ dc ← strat { id := id, cls := c, selected := [] },
 modify $ λ st, { passive := st.passive.insert id dc, ..st },
 pure id
 
+meta def remove_redundant (id : clause_id) : prover unit :=
+modify $ λ st, { active := st.active.erase id, ..st }
+
 meta def preprocessing_rule := list clause → prover (list clause)
 
 meta def simplification_rule := clause → prover (option clause)

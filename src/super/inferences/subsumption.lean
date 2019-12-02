@@ -24,4 +24,12 @@ meta def preprocessing.subsumption_interreduction : preprocessing_rule | cs := d
 s ← tactic.read,
 pure $ interreduce (does_subsume_pure s) cs
 
+meta def inference.backward_subsumption : inference_rule | given := do
+active ← get_active,
+s ← tactic.read,
+let subsumed := active.values.filter $ λ act,
+  act.id ≠ given.id ∧ does_subsume_pure s given.cls act.cls,
+subsumed.mmap' $ λ ss, remove_redundant ss.id,
+pure []
+
 end super

@@ -273,3 +273,7 @@ Instantiates metavariables that appear in the current goal.
 -/
 meta def instantiate_mvars_in_target : tactic unit :=
 target >>= instantiate_mvars >>= change
+
+def list.find {α} {p} [decidable_pred p] : list α → option α
+| [] := none
+| (x::xs) := if p x then x else xs.find
