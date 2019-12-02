@@ -83,6 +83,29 @@ meta def main (opts : options) (initial : list clause) : tactic (option expr) :=
 initial ← initial.mmap clause.clone, -- work around local context restriction
 prod.fst <$> state_t.run (main_loop opts initial 0) prover_state.initial
 
+meta def with_ground_mvars {α} (tac : tactic α) : tactic α := do
+reverted_goal ← tactic.retrieve (revert_all >> target),
+reverted_goal ← instantiate_mvars reverted_goal,
+mvars ← reverted_goal.sorted_mvars,
+lcs ← mk_locals_core mvars,
+let univ_mvars := (reverted_goal.mk_app lcs).univ_meta_vars.to_list,
+ups ← univ_mvars.mmap (λ _, mk_fresh_name),
+(goal::goals) ← get_goals,
+(res, proof) ← tactic.retrieve (do
+  (mvars.zip lcs).mmap' (λ ⟨m, lc⟩, unify m lc),
+  (univ_mvars.zip ups).mmap (λ ⟨m, up⟩, unify_level (level.mvar m) (level.param up)),
+  set_goals [goal],
+  instantiate_mvars_in_target,
+  res ← tac,
+  done,
+  proof ← instantiate_mvars goal,
+  pure (res, proof)),
+let proof := (proof.abstract_locals (lcs.map expr.local_uniq_name)).instantiate_vars mvars,
+let proof := proof.instantiate_univ_params
+  ((ups.zip univ_mvars).map (λ ⟨up, m⟩, (up, level.mvar m))),
+exact proof,
+pure res
+
 meta def solve (opts : options) (initial : list clause) : tactic unit := do
 some empty_clause ← main opts initial | fail "saturation",
 (target >>= is_def_eq `(false)) <|> exfalso,
@@ -143,7 +166,8 @@ open tactic
 
 -- TODO: show unused arguments
 meta def super (args : parse simp_arg_list)
-               (opts : super.options := {}) : tactic unit := do
+               (opts : super.options := {}) : tactic unit :=
+_root_.super.with_ground_mvars $ do
 cs ← _root_.super.clauses_of_simp_arg_type_list args,
 _root_.super.solve_with_goal opts cs
 

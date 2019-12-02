@@ -17,8 +17,8 @@ by super [prime, dvd_refl, dvd_mul_right, dvd_mul_left,
 nat_mul_cancel_one, not_prime_zero, mul_zero, zero_mul]
 
 example : nat.zero ≠ nat.succ nat.zero := by super
-example (x y : ℕ) : nat.succ x = nat.succ y → x = y := by super
-example (i) (a b c : i) : [a,b,c] = [b,c,a] -> a = b ∧ b = c := by super
+example (x y : ℕ) : nat.succ x = nat.succ y → x = y := by super [nat.succ_inj]
+example (i) (a b c : i) : [a,b,c] = [b,c,a] -> a = b ∧ b = c := by super [list.cons.inj]
 
 definition is_positive (n : ℕ) := n > 0
 example (n : ℕ) : n > 0 ↔ is_positive n := by super [is_positive]
@@ -40,6 +40,8 @@ example : ¬(inhabited ℕ → false) := by super
 example {a b} : ¬(b ∨ ¬a) ∨ (a → b) := by super
 example {a} : a ∨ ¬a := by super
 example {a} : (a ∧ a) ∨ (¬a ∧ ¬a) := by super
+example {a} : ¬a → (¬a ∧ ¬a) := by super
+example {a} : a ∨ a → a := by super
 example (i) (c : i) (p : i → Prop) (f : i → i) :
   p c → (∀x, p x → p (f x)) → p (f (f (f c))) := by super
 

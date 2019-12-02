@@ -159,6 +159,7 @@ meta def of_type_and_proof : expr → expr → tactic clause
 
 meta def of_proof (prf : expr) : tactic clause := do
 ty ← infer_type prf,
+ty ← instantiate_mvars ty,
 ty ← head_beta ty,
 of_type_and_proof ty prf
 

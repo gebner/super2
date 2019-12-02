@@ -264,3 +264,12 @@ meta def tactic.on_exception {α} (handler : tactic unit) (tac : tactic α) : ta
 end
 
 @[inline] instance has_monad_lift.refl {m} [monad m] : has_monad_lift m m := ⟨λ _, id⟩
+
+meta def tactic.unify_level (l1 l2 : level) : tactic unit :=
+tactic.unify (expr.sort l1) (expr.sort l2)
+
+/--
+Instantiates metavariables that appear in the current goal.
+-/
+meta def instantiate_mvars_in_target : tactic unit :=
+target >>= instantiate_mvars >>= change
