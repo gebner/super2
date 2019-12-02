@@ -5,7 +5,7 @@ open tactic
 
 private meta def unify_lit (a b : literal) : tactic unit := do
 guard $ a.is_pos = b.is_pos,
-unify a.formula b.formula transparency.none
+unify a.formula b.formula transparency.none tt
 
 private meta def try_subsume_core : list literal → list literal → tactic unit
 | [] _ := skip
