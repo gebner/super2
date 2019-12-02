@@ -68,23 +68,27 @@ end
 meta def clause_weight (c : derived_clause) : nat :=
 sum (c.cls.literals.map (λ l : literal, expr_size l.formula + if l.is_pos then 10 else 1))
 
-meta def find_minimal_by (passive : rb_map clause_id derived_clause)
-                         {A} [has_lt A] [decidable_rel ((<) : A → A → Prop)]
-                         (f : derived_clause → A) : clause_id :=
-match rb_map.min $ rb_map.of_list $ passive.values.map $ λc, (f c, c.id) with
-| some id := id
-| none := nat.zero
-end
+def find_minimal_by_core {α β} [has_lt β] [decidable_rel ((<) : β → β → Prop)]
+    (f : α → β) : list α → option α → option α
+| [] min := min
+| (x::xs) none := find_minimal_by_core xs x
+| (x::xs) (some y) := find_minimal_by_core xs $ if f x < f y then x else y
+
+def find_minimal_by {α β} [has_lt β] [decidable_rel ((<) : β → β → Prop)]
+    (xs : list α) (f : α → β) : option α :=
+find_minimal_by_core f xs none
 
 meta def age_of_clause_id : name → ℕ
 | (name.mk_numeral i _) := unsigned.to_nat i
 | _ := 0
 
 meta def find_minimal_weight (passive : rb_map clause_id derived_clause) : clause_id :=
-find_minimal_by passive $ λ c, (clause_weight c, c.id)
+(derived_clause.id <$> find_minimal_by passive.values (λ c, (clause_weight c, c.id)))
+  .get_or_else undefined
 
 meta def find_minimal_age (passive : rb_map clause_id derived_clause) : clause_id :=
-find_minimal_by passive $ λ c, c.id
+(derived_clause.id <$> find_minimal_by passive.values (λ c, c.id))
+  .get_or_else undefined
 
 meta def weight_clause_selection : clause_selection_strategy | iter :=
 do state ← get, return $ find_minimal_weight state.passive
