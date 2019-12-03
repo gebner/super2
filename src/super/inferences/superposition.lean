@@ -31,6 +31,7 @@ let c_subst : clause :=
     (clause_type.atom (ctx.app' r'))),
    prf_subst⟩,
 let a' := clause.resolve a ai c_subst 0,
+unify t.formula (ctx.app' l),
 pure $ if t.is_pos then
   clause.resolve b bi a' ai
 else
@@ -65,6 +66,8 @@ guard $ ¬ gt r l,
 st ← closed_subterms t.formula,
 pure $ do
 some () ← try_core (unify l st transparency.reducible) | pure [],
+st_ty ← infer_type st,
+some () ← try_core (unify ty st_ty transparency.semireducible) | pure [],
 l ← instantiate_mvars l,
 r ← instantiate_mvars r,
 tt ← pure (¬ gt r l : bool) | pure [],
