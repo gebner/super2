@@ -1,3 +1,4 @@
+import tactic.core
 
 attribute [inline] or.decidable decidable.to_bool bool.decidable_eq and.decidable
   nat.decidable_eq ne.decidable decidable.false implies.decidable option.get_or_else
@@ -94,12 +95,6 @@ meta def abstract_mvar_telescope : list expr → tactic (list expr)
   ms' ← abstract_mvar_telescope ms,
   pure $ t.abstract_mvars' ms :: ms'
 
-/-- Runs a tactic for a result, reverting the state after completion -/
-meta def tactic.retrieve {α} (tac : tactic α) : tactic α :=
-λ s, result.cases_on (tac s)
-  (λ a s', result.success a s)
-  result.exception
-
 meta def level.instantiate_univ_mvars (subst : rb_map name level) : level → level
 | level.zero := level.zero
 | (level.succ a) := a.instantiate_univ_mvars.succ
@@ -117,12 +112,6 @@ match e with
   some $ expr.sort (l.instantiate_univ_mvars subst)
 | _ := none
 end
-
-/-- `local_binding_info e` returns the binding info of `e` if `e` is a local constant.
-Otherwise returns `binder_info.default`. -/
-meta def expr.local_binding_info : expr → binder_info
-| (expr.local_const _ _ bi _) := bi
-| _ := binder_info.default
 
 meta def expr.mk_lambda (x e : expr) : expr :=
 expr.lam x.local_pp_name x.local_binding_info x.local_type (e.abstract x)
@@ -162,19 +151,8 @@ by cases classical.prop_decidable p; simp *
 lemma not_imp_iff_or {p q : Prop} : (¬ p → q) ↔ (p ∨ q) :=
 by cases classical.prop_decidable p; simp *
 
-@[simp] theorem and_imp {a b c} : (a ∧ b → c) ↔ (a → b → c) :=
-iff.intro (λ h ha hb, h ⟨ha, hb⟩) (λ h ⟨ha, hb⟩, h ha hb)
-
 theorem iff_imp {a b c} : ((a ↔ b) → c) ↔ ((a → b) → (b → a) → c) :=
 iff.intro (λ h ha hb, h ⟨ha, hb⟩) (λ h ⟨ha, hb⟩, h ha hb)
-
-theorem not.imp_symm {a b} (h : ¬a → b) (hb : ¬b) : a :=
-classical.by_contradiction $ hb ∘ h
-
-theorem classical.not_forall {α} {p : α → Prop} :
-  (¬ ∀ x, p x) ↔ ∃ x, ¬ p x :=
-⟨not.imp_symm $ λ nx x, nx.imp_symm $ λ h, ⟨x, h⟩,
- λ ⟨x, h⟩ h2, h (h2 _)⟩
 
 lemma classical.forall_imp_iff_exists_not_or {α} {p : α → Prop} {q : Prop} :
   ((∀ x, p x) → q) ↔ ((∃ x, ¬ p x) ∨ q) :=
@@ -194,19 +172,8 @@ def list.zip_with_index_core {α} : ℕ → list α → list (α × ℕ)
 def list.zip_with_index {α} : list α → list (α × ℕ) :=
 list.zip_with_index_core 0
 
-def option.to_list {α} : option α → list α
-| none     := []
-| (some a) := [a]
-
 def list.filter_maximal {α} (gt : α → α → bool) (l : list α) : list α :=
 l.filter $ λ x, ∀ y ∈ l, ¬ gt y x
-
-/-- Makes the declaration `classical.prop_decidable` available to type class inference.
-This asserts that all propositions are decidable, but does not have computational content. -/
-meta def tactic.classical : tactic unit :=
-do h ← get_unused_name `_inst,
-   mk_const ``classical.prop_decidable >>= note h none,
-   unfreeze_local_instances
 
 def list.m_any {α m} [monad m] (f : α → m bool) : list α → m bool
 | [] := pure ff
@@ -269,23 +236,10 @@ end
 meta def tactic.unify_level (l1 l2 : level) : tactic unit :=
 tactic.unify (expr.sort l1) (expr.sort l2)
 
-/--
-Instantiates metavariables that appear in the current goal.
--/
-meta def instantiate_mvars_in_target : tactic unit :=
-target >>= instantiate_mvars >>= change
-
-def list.find {α} {p} [decidable_pred p] : list α → option α
-| [] := none
-| (x::xs) := if p x then x else xs.find
-
 -- decidable instance for bounded existence is not short-circuiting?!?
 def list.existsb {α} (p : α → bool) : list α → bool
 | [] := ff
 | (x :: xs) := if p x then tt else xs.existsb
-
-meta def expr.to_nat (e : expr) : tactic ℕ :=
-eval_expr ℕ e
 
 meta def infer_univ (type : expr) : tactic level := do
 sort_of_type ← infer_type type >>= whnf,

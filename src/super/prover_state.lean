@@ -152,7 +152,7 @@ private meta def abstract_super_steps : expr → state_t (rb_map expr expr) tact
     state_t.lift (tactic.fail "abstract_super_steps ref"),
   (ty::i::args) ← pure ref.get_app_args |
     state_t.lift (tactic.fail "abstract_super_steps ref"),
-  i ← state_t.lift i.to_nat,
+  some i ← pure i.to_nat | state_t.lift (tactic.fail "abstract_super_steps i"),
   lc ← flip rb_map.find ty <$> get,
   ff ← pure (ty.has_var : bool) |
     state_t.lift (tactic.fail "abstract_super_steps has_var"),
