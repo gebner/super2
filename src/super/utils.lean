@@ -283,3 +283,15 @@ def list.find {α} {p} [decidable_pred p] : list α → option α
 def list.existsb {α} (p : α → bool) : list α → bool
 | [] := ff
 | (x :: xs) := if p x then tt else xs.existsb
+
+meta def expr.to_nat (e : expr) : tactic ℕ :=
+eval_expr ℕ e
+
+meta def infer_univ (type : expr) : tactic level := do
+sort_of_type ← infer_type type >>= whnf,
+match sort_of_type with
+| expr.sort lvl := pure lvl
+| not_sort := do
+  fmt ← pp not_sort,
+  fail $ (to_fmt "cannot get universe level of sort:" ++ format.line ++ fmt).group.nest 1
+end

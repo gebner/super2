@@ -209,6 +209,7 @@ meta def check (cls : clause) : tactic unit :=
 on_exception (do trace "\n", trace cls.prf, trace cls.ty, trace_call_stack) $ do
 when cls.prf.has_var (fail $ to_fmt "proof has de Bruijn variables"),
 when cls.ty.to_expr.has_var (fail $ to_fmt "type has de Bruijn variables"),
+type_check cls.ty.to_expr,
 type_check cls.prf,
 infer_type cls.prf >>= is_def_eq cls.ty.to_expr
 
@@ -295,5 +296,28 @@ mvars ← c.prf.sorted_mvars,
 lcs ← abstract_mvar_telescope mvars >>= mk_locals_core,
 (mvars.zip lcs).mmap' (λ x, unify x.1 x.2),
 c.instantiate_mvars
+
+protected meta def {u} ref {α : Sort u} (i : ℕ) : α := undefined
+protected lemma {u} step (α : Sort u) {a : α} : α := a
+
+namespace clause
+
+meta def mk_decl (c : clause) (i : ℕ) : tactic (expr × expr × expr) :=
+retrieve $ do
+c ← c.instantiate_mvars,
+mvars ← c.prf.sorted_mvars,
+free_var_tys ← abstract_mvar_telescope mvars,
+let ty := free_var_tys.foldl (λ e x, expr.pi `x binder_info.default x e)
+  (c.ty.to_expr.abstract_mvars' mvars),
+let prf := free_var_tys.foldl (λ e x, expr.lam `x binder_info.default x e)
+  (c.prf.abstract_mvars' mvars),
+ty_univ ← infer_univ ty,
+c_ty_univ ← infer_univ c.ty.to_expr,
+let new_prf := expr.const' ``super.step [c_ty_univ] c.ty.to_expr
+  ((expr.const' ``super.ref [ty_univ] ty `(i)).mk_app mvars.reverse),
+clause.check_if_debug ⟨c.ty, new_prf⟩,
+pure (new_prf, ty, prf)
+
+end clause
 
 end super

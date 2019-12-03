@@ -65,7 +65,10 @@ match derived_empty_clauses with
 | (c::_) := do
   c ← c.instantiate_mvars,
   c.check,
-  pure c.prf
+  prf ← unfold_defs c.prf,
+  type_check prf,
+  state_t.lift $ infer_type prf >>= is_def_eq `(false),
+  pure prf
 | _ := do
 newly_derived.mmap' (add_passive opts.literal_selection),
 passive_size ← rb_map.size <$> get_passive,
@@ -86,6 +89,8 @@ else do
           trace $ "[a=" ++ to_string act.size ++
                   ",p=" ++ to_string passive_size ++
                   "] " ++ to_string given),
+    given.cls.check,
+    given ← intern_derived given,
     add_active given,
     given' ← given.clone,
     newly_derived ← list.join <$> opts.inf_rules.mmap (λ ir, ir given'),

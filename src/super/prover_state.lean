@@ -40,12 +40,14 @@ meta structure prover_state :=
 (passive : rb_map clause_id derived_clause)
 (prec : list name)
 (clause_counter : ℕ)
+(steps : list (expr × expr))
 
 meta def prover_state.initial : prover_state :=
 { active := mk_rb_map,
   passive := mk_rb_map,
   prec := [],
-  clause_counter := 0 }
+  clause_counter := 0,
+  steps := [] }
 
 meta def prover := state_t prover_state tactic
 
@@ -133,5 +135,68 @@ do s ← get, ↑(tactic.retrieve $ prod.fst <$> p.run s)
 meta def retrieve_packed (ps : list (prover (list clause))) : prover (list clause) :=
 (list.join <$> monad.sequence (do p ← ps, pure $ retrieve $ p >>= list.mmap (λ c, c.pack)))
   >>= list.mmap (λ c : packed_clause, clause.check_result_if_debug c.unpack)
+
+meta def intern (c : clause) : prover clause := do
+i ← (λ st : prover_state, st.steps.length) <$> get,
+(new_prf, ty, prf) ← c.mk_decl i,
+modify $ λ st, { steps := st.steps ++ [(ty, prf)], ..st },
+pure { prf := new_prf, ..c }
+
+meta def intern_derived (c : derived_clause) : prover derived_clause := do
+cls ← intern c.cls,
+pure { cls := cls, ..c }
+
+private meta def abstract_super_steps : expr → state_t (rb_map expr expr) tactic expr
+| (expr.app (expr.app (expr.const ``super.step _) _) ref) := do
+  ``super.ref ← pure ref.get_app_fn.const_name |
+    state_t.lift (tactic.fail "abstract_super_steps ref"),
+  (ty::i::args) ← pure ref.get_app_args |
+    state_t.lift (tactic.fail "abstract_super_steps ref"),
+  i ← state_t.lift i.to_nat,
+  lc ← flip rb_map.find ty <$> get,
+  ff ← pure (ty.has_var : bool) |
+    state_t.lift (tactic.fail "abstract_super_steps has_var"),
+  lc ← match lc with
+  | some lc := pure lc
+  | none := do
+    lc ← state_t.lift $
+      mk_local' ("step_" ++ to_string i : string)
+        binder_info.default ty,
+    state_t.modify $ λ st, st.insert ty lc,
+    pure lc
+  end,
+  lc.mk_app <$> args.mmap abstract_super_steps
+| (expr.lam n bi a b) := expr.lam n bi <$> abstract_super_steps a <*> abstract_super_steps b
+| (expr.pi n bi a b) := expr.pi n bi <$> abstract_super_steps a <*> abstract_super_steps b
+| (expr.elet n a b c) := expr.elet n <$> abstract_super_steps a
+  <*> abstract_super_steps b <*> abstract_super_steps c
+| (expr.sort u) := pure $ expr.sort u
+| e@(expr.const _ _) := pure e
+| e@(expr.var _) := pure e
+| e@(expr.local_const _ _ _ _) := pure e
+| e@(expr.mvar _ _ _) := pure e
+| (expr.macro md es) := expr.macro md <$> es.mmap abstract_super_steps
+| (expr.app a b) := expr.app <$> abstract_super_steps a <*> abstract_super_steps b
+
+private meta def unfold_defs_core : list (expr × expr) → expr → state_t (rb_map expr expr) tactic expr
+| ((ty,prf) :: steps) e := do
+  e ← unfold_defs_core steps e,
+  lcs ← rb_map.to_list <$> get,
+  lcs.mfoldr (λ ⟨ty', lc⟩ e, do
+      some prf' ← state_t.lift $ tactic.retrieve $ try_core $
+            unify ty ty' >> instantiate_mvars prf
+        | pure e,
+      state_t.modify $ λ st, st.erase ty',
+      prf' ← abstract_super_steps prf',
+      pure $ expr.elet lc.local_pp_name ty' prf'
+        (e.abstract_local lc.local_uniq_name))
+    e
+| [] e := abstract_super_steps e
+
+meta def unfold_defs (e : expr) : prover expr := do
+steps ← prover_state.steps <$> get,
+(e', lcs) ← (unfold_defs_core steps e).run mk_rb_map,
+0 ← pure lcs.size | fail "unfold_defs did not unfold all defs",
+pure e'
 
 end super
