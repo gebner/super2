@@ -44,6 +44,7 @@ some t ← pure $ b.literals.nth bi,
 ctx ← kabstract t.formula l transparency.reducible ff,
 if ¬ ctx.has_var then pure none else do
 let ctx := expr.lam `x binder_info.default ty ctx,
+some () ← try_core (type_check ctx) | pure none,
 pure <$> a.rewrite_in_ctx ctx tt ai b bi
 
 -- TODO: ignore at least dependent arguments
