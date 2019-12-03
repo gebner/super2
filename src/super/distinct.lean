@@ -70,7 +70,7 @@ private meta def distinct_core : clause → list literal → clause
       if res.is_or_ff_clean then res else distinct_core res ctx
     | clause_type.ff := undefined_core "distinct_core ff"
     | clause_type.imp a1 clause_type.ff :=
-      distinct_core ⟨clause_type.imp a1 b, `((@imp_iff_or_not %%a1 %%b.to_expr).mpr)⟩ ctx
+      distinct_core ⟨clause_type.imp a1 b, `((@imp_iff_or_not %%a1 %%b.to_expr).mpr %%prf)⟩ ctx
     | clause_type.imp a1 a2 :=
       distinct_core ⟨clause_type.or (clause_type.or (clause_type.imp a1 clause_type.ff) a2) b,
         `(@or_imp_congr_left %%b.to_expr %%a.to_expr (¬ %%a1 ∨ %%a2.to_expr)
