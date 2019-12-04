@@ -55,6 +55,8 @@ private meta def clausify_core : clause → tactic (list clause)
 | c@⟨atom `(@eq Prop %%a %%b), prf⟩ := do
   prf' ← mk_mapp ``eq.to_iff [a, b, prf],
   clausify_core ⟨atom `(%%a ↔ %%b), prf'⟩
+| ⟨atom (expr.app (expr.app (expr.app (expr.const ``ne [l]) ty) a) b), prf⟩ :=
+  clausify_core ⟨imp (expr.const' ``eq [l] ty a b) ff, prf⟩
 | ⟨atom `(false), prf⟩ := pure [⟨ff, prf⟩]
 | ⟨atom `(true), prf⟩ := pure []
 
@@ -99,6 +101,8 @@ private meta def clausify_core : clause → tactic (list clause)
   prf' ← mk_mapp ``propext [a, b],
   prf' ← mk_mapp ``function.comp [none, none, none, prf, prf'],
   clausify_core ⟨imp `(%%a ↔ %%b) c, prf'⟩
+| ⟨imp (expr.app (expr.app (expr.app (expr.const ``ne [l]) ty) a) b) c, prf⟩ :=
+  clausify_core ⟨imp ((expr.const' ``eq [l] ty a b).imp `(false)) c, prf⟩
 | ⟨imp `(%%a ↔ %%b) c, prf⟩ :=
   clausify_core ⟨imp (a.imp b) (imp (b.imp a) c),
     `((@iff_imp %%a %%b %%c.to_expr).mp %%prf)⟩
@@ -123,6 +127,7 @@ meta def clause_type.is_clausified : clause_type → bool
 | (atom `(false)) := ff
 | (atom `(true)) := ff
 | (atom `(@eq Prop %%_ %%_)) := ff
+| (atom `(_ ≠ _)) := ff
 
 | (imp `(%%a ∧ %%b) d) := ff
 | (imp `(%%a ∨ %%b) d) := ff
@@ -133,6 +138,7 @@ meta def clause_type.is_clausified : clause_type → bool
 | (imp `(true) b) := ff
 | (imp `(@eq Prop %%_ %%_) b) := ff
 | (imp `(%%a ↔ %%b) c) := ff
+| (imp `(_ ≠ _) _) := ff
 
 | (atom _) := tt
 | (imp a b) := b.is_clausified
