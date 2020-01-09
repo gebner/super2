@@ -17,9 +17,9 @@ meta def default_preprocessing_rules : list preprocessing_rule :=
   preprocessing.neg_refl,
   preprocessing.flip_eq,
   preprocessing.distinct,
-  preprocessing.subsumption_interreduction,
+  preprocessing.subsumption_interreduction
   -- preprocessing.forward_subsumption,
-  preprocessing.empty_clause ]
+]
 
 meta def default_simplification_rules : list simplification_rule :=
 [ simplification.forward_demod,
@@ -52,9 +52,16 @@ cls : option clause ← opts.simpl_rules.mfoldl (λ cls sr,
   end) (some given.cls),
 pure $ cls.map $ λ cls, { cls := cls, ..given }
 
-meta def do_preprocessing (opts : options)
-  (newly_derived : list clause) : prover (list clause) :=
-opts.preproc_rules.mfoldl (λ cls pr, pr cls) newly_derived
+meta def do_preprocessing (opts : options) : list clause → prover (list clause) | newly_derived := do
+newly_derived ← opts.preproc_rules.mfoldl (λ cls pr, pr cls) newly_derived,
+if ¬ newly_derived.existsb (λ c : clause, c.ty.literals = []) then
+  pure newly_derived
+else do
+  newly_derived ← preprocessing.empty_clause newly_derived,
+  if ¬ newly_derived.existsb (λ c : clause, c.ty.literals = []) then
+    do_preprocessing newly_derived
+  else
+    pure newly_derived
 
 declare_trace super
 

@@ -12,6 +12,9 @@ by super
 lemma exst {α} (h : ∃ x : α, x = x) : true :=
 by super *
 
+lemma and_false' (h : ∃ w : ℕ, ∀ x : ℕ, w = x ∧ false) : false :=
+by super *
+
 lemma baz (a b c : ℕ) : a + (b + c) = (a + b) + c :=
 by super [add_assoc, add_zero, add_comm]
 
