@@ -50,7 +50,7 @@ private meta def clausify_core : clause → tactic (list clause)
   nonempty_ty ← mk_mapp ``nonempty [α],
   nonempty_inst ← mk_instance nonempty_ty <|> mk_meta_var nonempty_ty,
   sk_term ← mk_mapp ``classical.epsilon [α, nonempty_inst, p],
-  prf' ← mk_mapp ``classical.epsilon_spec [α, p, prf],
+  prf' ← mk_mapp ``classical.epsilon_spec_aux [α, nonempty_inst, p, prf],
   clausify_core ⟨atom (p.app' sk_term), prf'⟩
 | c@⟨atom `(@eq Prop %%a %%b), prf⟩ := do
   prf' ← mk_mapp ``eq.to_iff [a, b, prf],

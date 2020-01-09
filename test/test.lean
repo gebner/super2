@@ -9,6 +9,9 @@ by super *
 lemma bar (p : ℕ → Prop) : p 0 → (∀ x, p x → p (x + 1)) → p 10 :=
 by super
 
+lemma exst {α} (h : ∃ x : α, x = x) : true :=
+by super *
+
 lemma baz (a b c : ℕ) : a + (b + c) = (a + b) + c :=
 by super [add_assoc, add_zero, add_comm]
 
