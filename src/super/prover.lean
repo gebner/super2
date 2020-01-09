@@ -140,12 +140,22 @@ exact empty_clause
 meta def intros' : tactic (list expr) :=
 (do x ← intro_core `_, xs ← intros', pure (x::xs)) <|> pure []
 
+noncomputable lemma {u} super_contradiction {α : Sort u} (h : (α → false) → false) : α :=
+match classical.type_decidable α with
+| psum.inl a := a
+| psum.inr nota := @false.rec _ (h nota)
+end
+
+meta def better_contradiction : tactic expr :=
+tactic.by_contradiction <|>
+  (applyc ``super_contradiction >> intro1)
+
 meta def solve_with_goal (opts : options) (initial : list clause) : tactic unit := do
 classical,
 hs ← intros',
 tgt ← target,
 hs ← if tgt = `(false) then pure hs else
-  (::) <$> by_contradiction <*> pure hs,
+  (::) <$> better_contradiction <*> pure hs,
 initial ← (++ initial) <$> hs.mmap clause.of_proof,
 some empty_clause ← main opts initial | fail "saturation",
 exact empty_clause
