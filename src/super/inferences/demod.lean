@@ -85,13 +85,14 @@ pure $ some ⟨mvars, umvars, free_var_tys, simpld⟩
 
 meta def simplify_with_ground (cls : clause) (tac : clause → tactic (option clause)) :
   tactic (option clause) :=
-option.map (λ s : list expr × packed_clause, s.2.cls.instantiate_vars s.1.reverse) <$>
+option.map (λ s : list expr × packed_clause, s.2.cls.instantiate_vars s.1) <$>
   simplify_with_ground_core cls tac
 
 meta def simplification.forward_demod : simplification_rule | cls := do
 gt ← get_term_order,
 simpl_clauses@(_::_) ← get_simpl_clauses | pure cls,
 simpld ← simplify_with_ground cls $ simplify_clause gt simpl_clauses,
+simpld.to_list.mmap' (monad_lift ∘ clause.check_if_debug),
 pure $ simpld.get_or_else cls
 
 meta def simplify_with_ground_packed (cls : clause) (tac : clause → tactic (option clause)) :
