@@ -192,7 +192,7 @@ meta def of_type_and_proof : expr → expr → tactic clause
 | ty@(expr.pi _ _ a b) prf :=
   if b.has_var then do
     m ← mk_meta_var a,
-    of_type_and_proof (b.instantiate_var m) (prf m)
+    of_type_and_proof (b.instantiate_var m) (prf.app' m)
   else do
     ty ← clause_type.of_expr ty,
     pure ⟨ty, prf⟩

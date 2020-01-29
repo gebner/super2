@@ -157,6 +157,12 @@ tgt ← target,
 hs ← if tgt = `(false) then pure hs else
   (::) <$> better_contradiction <*> pure hs,
 initial ← (++ initial) <$> hs.mmap clause.of_proof,
+-- FIXME: happens e.g. with eq.mpr
+initial ← initial.mfilter (λ c, do
+  is_ok ← succeeds c.check,
+  if is_ok then pure tt else do
+  trace "discarding clause, invalid type",
+  pure ff),
 some empty_clause ← main opts initial | fail "saturation",
 exact empty_clause
 
