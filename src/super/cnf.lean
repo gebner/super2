@@ -60,7 +60,6 @@ namespace super
 
 open clause_type tactic
 
-#print classical.epsilon
 private meta def clausify_neg : expr → tactic (option (list clause))
 | `(false) := pure (some [])
 | `(true) := pure (some [⟨clause_type.atom `(true), `(true.intro)⟩])
