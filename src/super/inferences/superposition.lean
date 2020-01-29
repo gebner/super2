@@ -3,7 +3,7 @@ import super.prover_state super.resolve
 namespace super
 open native tactic expr
 
-meta def clause.flip (c : clause) (i : ℕ) : clause :=
+meta def clause.flip (c : clause) (i : ℕ) : tactic clause :=
 match c.literals.nth i with
 | some (literal.pos e@(app (app (app (const ``eq [l]) ty) a) b)) :=
   clause.resolve c i ⟨clause_type.imp e (clause_type.atom (const' ``eq [l] ty b a)),
@@ -11,12 +11,12 @@ match c.literals.nth i with
 | some (literal.neg e@(app (app (app (const ``eq [l]) ty) a) b)) :=
   clause.resolve ⟨clause_type.imp (const' ``eq [l] ty b a) (clause_type.atom e),
     const' ``eq.symm [l] ty b a⟩ 1 c i
-| _ := undefined_core $ "clause_flip " ++ to_string c ++ " " ++ to_string i
+| _ := fail $ "clause_flip " ++ to_string c ++ " " ++ to_string i
 end
 
 meta def clause.rewrite_in_ctx (ctx : expr) (ltr : bool)
   (a : clause) (ai : ℕ) (b : clause) (bi : ℕ) : tactic clause := do
-let a := if ltr then a else a.flip ai,
+a ← if ltr then pure a else a.flip ai,
 some (literal.pos eq_f@`(@eq %%ty %%l %%r)) ← pure $ a.literals.nth ai,
 some t ← pure $ b.literals.nth bi,
 let prf_subst :=
@@ -30,16 +30,16 @@ let c_subst : clause :=
   ⟨clause_type.imp eq_f (clause_type.imp (ctx.app' l')
     (clause_type.atom (ctx.app' r'))),
    prf_subst⟩,
-let a' := clause.resolve a ai c_subst 0,
+a' ← clause.resolve a ai c_subst 0,
 unify t.formula (ctx.app' l),
-pure $ if t.is_pos then
+if t.is_pos then
   clause.resolve b bi a' ai
 else
   clause.resolve a' (ai + 1) b bi
 
 meta def clause.krewrite (ltr : bool)
   (a : clause) (ai : ℕ) (b : clause) (bi : ℕ) : tactic (option clause) := do
-let a := if ltr then a else a.flip ai,
+a ← if ltr then pure a else a.flip ai,
 some (literal.pos `(@eq %%ty %%l %%r)) ← pure $ a.literals.nth ai,
 some t ← pure $ b.literals.nth bi,
 ctx ← kabstract t.formula l transparency.reducible ff,
@@ -95,7 +95,7 @@ retrieve_packed $ do
 pure $ do
 some () ← try_core (unify l r) | pure [],
 rfl_prf ← mk_eq_refl l,
-pure $ pure $ given.cls.propg_pos i rfl_prf
+pure <$> given.cls.propg_pos i rfl_prf
 
 meta def simplification.pos_refl : simplification_rule | cls :=
 if cls.literals.existsb $ λ l, match l with
@@ -112,7 +112,7 @@ first (do
   pure $ do
   is_def_eq a b,
   rfl_prf ← mk_eq_refl a,
-  pure $ some $ cls.propg_pos i rfl_prf)
+  some <$> cls.propg_pos i rfl_prf)
 <|> pure cls
 
 meta def preprocessing.pos_refl : preprocessing_rule :=
@@ -124,15 +124,15 @@ simplification.neg_refl.as_preprocessing_rule
 open expr
 meta def simplification.flip_eq : simplification_rule | c := do
 gt ← get_term_order,
-pure $ pure $ c.literals.zip_with_index.foldl (λ c l,
+pure <$> c.literals.zip_with_index.mfoldl (λ c l,
   match l.1.formula with
-  | e@(app (app (app (const ``eq [lvl]) ty) a) b) :=
-    let e' := const' ``eq [lvl] ty b a in
+  | e@(app (app (app (const ``eq [lvl]) ty) a) b) := do
+    let e' := const' ``eq [lvl] ty b a,
     if gt e e' then
       c.flip l.2
     else
-      c
-  | _ := c
+      pure c
+  | _ := pure c
   end) c
 
 meta def preprocessing.flip_eq : preprocessing_rule :=

@@ -18,4 +18,6 @@ by super *
 lemma baz (a b c : ℕ) : a + (b + c) = (a + b) + c :=
 by super [add_assoc, add_zero, add_comm]
 
+#print foo
+
 #print baz

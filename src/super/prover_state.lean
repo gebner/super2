@@ -111,7 +111,8 @@ return state.clause_counter
 meta def add_passive (strat : literal_selection_strategy) (c : clause) : prover clause_id := do
 c.check_if_debug,
 id ← get_new_cls_id,
-register_consts_in_precedence (contained_funsyms c.ty.to_expr).to_list, -- TODO: rethink this
+c_ty ← c.ty.to_expr,
+register_consts_in_precedence (contained_funsyms c_ty).to_list, -- TODO: rethink this
 dc ← strat { id := id, cls := c, selected := [] },
 modify $ λ st, { passive := st.passive.insert id dc, ..st },
 pure id

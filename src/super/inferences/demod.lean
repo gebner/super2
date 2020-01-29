@@ -56,11 +56,11 @@ meta def simplify_clause (cls : clause) : tactic (option clause) := do
       if l.is_pos then do
         prf ← mk_mapp ``eq.mpr [f', l.formula, prf],
         let prf : clause := ⟨clause_type.imp l.formula (clause_type.atom f'), prf⟩,
-        pure (tt, clause.resolve cls i prf 0)
+        prod.mk tt <$> clause.resolve cls i prf 0
       else do
         prf ← mk_mapp ``eq.mp [f', l.formula, prf],
         let prf : clause := ⟨clause_type.imp f' (clause_type.atom l.formula), prf⟩,
-        pure (tt, clause.resolve prf 1 cls i)
+        prod.mk tt <$> clause.resolve prf 1 cls i
     end)
   (ff, cls) : tactic (bool × clause)),
 if did_simpl then pure simpld else pure none
@@ -107,8 +107,9 @@ if funsym = name.anonymous then pure [] else do
 gt ← get_term_order,
 active ← get_active,
 list.join <$> (active.values.mmap $ λ act,
-  if act.id = given.id then pure [] else
-  if (contained_funsyms act.cls.ty.to_expr).contains funsym then do
+  if act.id = given.id then pure [] else do
+  act_ty ← act.cls.ty.to_expr,
+  if (contained_funsyms act_ty).contains funsym then do
     simpld ← simplify_with_ground_packed act.cls $
       simplify_clause gt simpl_clauses,
     match simpld with

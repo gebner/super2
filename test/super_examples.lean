@@ -19,7 +19,7 @@ example {m n : ℕ} : prime (m * n) → m = 1 ∨ n = 1 :=
 by super [prime, dvd_refl, dvd_mul_right, dvd_mul_left,
 nat_mul_cancel_one, not_prime_zero, mul_zero, zero_mul]
 
-example : nat.zero ≠ nat.succ nat.zero := by super
+example : nat.zero ≠ nat.succ nat.zero := by super [nat.zero_lt_succ, ne_of_lt]
 example (x y : ℕ) : nat.succ x = nat.succ y → x = y := by super [nat.succ_inj]
 example (i) (a b c : i) : [a,b,c] = [b,c,a] -> a = b ∧ b = c := by super [list.cons.inj]
 
@@ -35,7 +35,8 @@ begin intros, have h : nat.zero = 0 := rfl, induction x,
       super [*, nat.add_succ, nat.succ_add] end
 
 example (i) [inhabited i] : nonempty i := by super *
-example (i) [nonempty i] : ¬(inhabited i → false) := by super *
+example (i) [nonempty i] : ¬(inhabited i → false) :=
+by super [classical.inhabited_of_nonempty]
 
 example : nonempty ℕ := by super
 example : ¬(inhabited ℕ → false) := by super

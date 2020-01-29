@@ -21,7 +21,7 @@ first $ c.literals.zip_with_index.reverse.map $ λ ⟨l, i⟩, do
   if l.is_pos then
     pure ⟨clause_type.atom l.formula, inst⟩
   else
-    pure $ c.propg_pos i inst
+    c.propg_pos i inst
 
 meta def simplification.inhabited : simplification_rule | c := do
 some c ← try_core (synth1_via_type_class c) | pure c,

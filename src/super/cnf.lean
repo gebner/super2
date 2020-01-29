@@ -1,120 +1,183 @@
 import super.clause super.distinct
+universes u v
+
+namespace classical
+
+noncomputable def not_not' {α : Sort u} (h : (α → false) → false) : α :=
+match type_decidable α with
+| (psum.inl a) := a
+| (psum.inr not_a) := (h not_a).elim
+end
+
+variables {α : Sort u} [nonempty α] (p : α → Sort v)
+
+noncomputable def iota : α :=
+epsilon (λ x, p x → false)
+
+noncomputable def epsilon' : α :=
+iota (λ x, p x → false)
+
+variables {p}
+
+noncomputable def iota_spec (h : p (iota p)) : ∀ x, p x :=
+λ x, not_not' $ λ not_px, epsilon_spec ⟨x, not_px⟩ h
+
+noncomputable def epsilon'_spec (x : α) (h : p x) : p (epsilon' p) :=
+not_not' $ λ not_p_eps : (λ x, p x → false) _, iota_spec not_p_eps x h
+
+lemma epsilon_spec' {p : α → Prop} (h : ∃ x, p x) : p (epsilon p) :=
+epsilon_spec h
+
+end classical
+
+namespace Exists
+
+noncomputable def witness {α} {p : α → Prop} (h : ∃ x, p x) : α :=
+classical.choice (nonempty_of_exists h)
+
+end Exists
+
+section
+open_locale classical
+
+lemma nonempty_or_nonempty_pi {α : Sort u} {β : α → Sort v} :
+  nonempty α ∨ nonempty (∀ x, β x) :=
+if h : nonempty α then
+  or.inl h
+else
+  or.inr ⟨λ x, (h ⟨x⟩).elim⟩
+
+lemma nonempty_or_nonempty_fun {α : Sort u} {β : Sort v} :
+  nonempty α ∨ nonempty (α → β) :=
+nonempty_or_nonempty_pi
+
+lemma or_imp {p q : Prop} : p ∨ (p → q) :=
+by by_cases p; simp *
+
+end
 
 namespace super
 
 open clause_type tactic
 
-meta def mk_local_hyp (type : expr) : tactic expr :=
-mk_local' type.hyp_name_hint binder_info.default type
-
-meta def mk_c (n : name) : expr :=
-expr.const n []
-
-private meta def congr (f : clause → tactic (list clause)) : clause → tactic (list clause)
-| c@⟨atom _, _⟩ := pure [c]
-| c@⟨ff, _⟩ := pure [c]
-| ⟨or a b, prf⟩ := do
-  pa ← mk_local_hyp a.to_expr,
-  pb ← mk_local_hyp b.to_expr,
-  csa ← f ⟨a, pa⟩,
-  csb ← f ⟨b, pb⟩,
-  pure $ do ⟨a', prfa'⟩ ← csa, ⟨b', prfb'⟩ ← csb, pure $
-  ⟨or a' b', `(@or_imp_congr %%a.to_expr %%a'.to_expr %%b.to_expr %%b'.to_expr
-    %%(pa.mk_lambda prfa') %%(pb.mk_lambda prfb') %%prf)⟩
-| ⟨imp a b, prf⟩ := do
-  pa ← mk_local_hyp a,
-  cs ← f ⟨b, prf.app' pa⟩,
-  pure $ cs.map $ λ ⟨b', prf'⟩, ⟨imp a b', pa.mk_lambda prf'⟩
-
-private meta def clausify_core : clause → tactic (list clause)
-| c := do c.check_if_debug, clause.check_results_if_debug $ match c with
-
-| c@⟨atom `(%%a ∧ %%b), prf⟩ :=
-  list.join <$> list.mmap clausify_core
-  [⟨atom a, `(@and.left %%a %%b %%prf)⟩, ⟨atom b, `(@and.right %%a %%b %%prf)⟩]
-| c@⟨atom `(%%a ↔ %%b), prf⟩ :=
-  list.join <$> list.mmap clausify_core
-  [⟨imp a (atom b), `(@iff.mp %%a %%b %%prf)⟩,
-   ⟨imp b (atom a), `(@iff.mpr %%a %%b %%prf)⟩]
-| c@⟨atom (expr.pi n bi t a), prf⟩ :=
-  if a.has_var then do
-    m ← mk_meta_var t,
-    clausify_core ⟨atom (a.instantiate_var m), prf.app' m⟩
-  else
-    clausify_core ⟨imp t (atom a), prf⟩
-| c@⟨atom `(%%a ∨ %%b), prf⟩ :=
-  clausify_core ⟨or (atom a) (atom b), prf⟩
-| c@⟨atom `(¬ %%a), prf⟩ :=
-  clausify_core ⟨imp a ff, prf⟩
-| c@⟨atom `(@Exists %%α %%p), prf⟩ := do
-  nonempty_ty ← mk_mapp ``nonempty [α],
-  nonempty_inst ← mk_instance nonempty_ty <|> mk_meta_var nonempty_ty,
-  sk_term ← mk_mapp ``classical.epsilon [α, nonempty_inst, p],
-  prf' ← mk_mapp ``classical.epsilon_spec_aux [α, nonempty_inst, p, prf],
-  clausify_core ⟨atom (p.app' sk_term), prf'⟩
-| c@⟨atom `(@eq Prop %%a %%b), prf⟩ := do
-  prf' ← mk_mapp ``eq.to_iff [a, b, prf],
-  clausify_core ⟨atom `(%%a ↔ %%b), prf'⟩
-| ⟨atom (expr.app (expr.app (expr.app (expr.const ``ne [l]) ty) a) b), prf⟩ :=
-  clausify_core ⟨imp (expr.const' ``eq [l] ty a b) ff, prf⟩
-| ⟨atom `(false), prf⟩ := pure [⟨ff, prf⟩]
-| ⟨atom `(true), prf⟩ := pure []
-
-| c@⟨imp `(%%a ∧ %%b) d, prf⟩ :=
-  clausify_core ⟨imp a (imp b d), `((@and_imp %%a %%b %%d.to_expr).mp %%prf)⟩
-| c@⟨imp `(%%a ∨ %%b) d, prf⟩ := do
-  prf_ad ← mk_mapp ``function.comp [none, none, none, prf, mk_c ``or.inl a b],
-  prf_bd ← mk_mapp ``function.comp [none, none, none, prf, mk_c ``or.inr a b],
-  list.join <$> list.mmap clausify_core [⟨imp a d, prf_ad⟩, ⟨imp b d, prf_bd⟩]
-| c@⟨imp a@`(@Exists %%α %%p) b, prf⟩ := do
-  witness ← mk_meta_var α,
-  ex_prf ← mk_mapp ``Exists.intro [α, p, witness],
-  prf' ← mk_mapp ``function.comp [none, none, none, prf, ex_prf],
-  clausify_core ⟨imp (p.app' witness) b, prf'⟩
-| c@⟨imp (expr.pi n bi a b) d, prf⟩ := do
-  a_prop ← is_prop a,
-  ha ← mk_local_hyp a,
-  b_prop ← is_prop (b.instantiate_var ha),
-  if b.has_var ∧ b_prop then do
-    m ← mk_meta_var a,
+#print classical.epsilon
+private meta def clausify_neg : expr → tactic (option (list clause))
+| `(false) := pure (some [])
+| `(true) := pure (some [⟨clause_type.atom `(true), `(true.intro)⟩])
+| ab@`(%%a ∧ %%b) :=
+  pure $ some [⟨((clause_type.atom ab).imp b).imp a, `(@and.intro %%a %%b)⟩]
+| ab@`(%%a ∨ %%b) :=
+  pure $ some [
+    ⟨(clause_type.atom ab).imp a, `(@or.inl %%a %%b)⟩,
+    ⟨(clause_type.atom ab).imp b, `(@or.inr %%a %%b)⟩
+  ]
+| a@`(@Exists %%α %%p) := do
+  m ← mk_meta_var α,
+  prf ← mk_mapp ``exists.intro [α, p, m],
+  pure $ some [⟨(clause_type.atom a).imp (p.app' m), prf⟩]
+| not_a@`(¬ %%a) := do
+  prf ← mk_mapp ``classical.or_not [a],
+  pure $ some [⟨clause_type.or (clause_type.atom a) (clause_type.atom not_a), prf⟩]
+| ab@`(%%a ↔ %%b) :=
+  pure $ some [⟨((clause_type.atom ab).imp (b.imp a)).imp (a.imp b),
+    `(@iff.intro %%a %%b)⟩]
+| ab@`(%%a ≠ %%b) := do
+  e ← mk_mapp ``eq [none, a, b],
+  pure $ some [⟨(clause_type.atom e).or (clause_type.atom ab),
+    `(@classical.or_not %%e)⟩]
+| ab@(expr.pi n bi a b) := do
+  if b.has_var then do
+    nonempty_ty ← mk_mapp ``_root_.nonempty [a],
+    nonempty_inst ← mk_instance nonempty_ty <|> mk_meta_var nonempty_ty,
     let p := expr.lam n bi a b,
-    x ← mk_local' `x binder_info.default a,
-    b' ← mk_mapp ``Exists [a, x.mk_lambda `(¬ %%(p.app' x))],
-    prf' ← mk_mapp ``classical.forall_imp_iff_exists_not_or [a, p, d.to_expr],
-    prf' ← mk_mapp ``iff.mp [none, none, prf', prf],
-    clausify_core ⟨or (atom b') d, prf'⟩
-  else if ¬ b.has_var ∧ a_prop ∧ b_prop then do
-    let prf_or_not_imp := `((@imp_iff_or_not %%a %%b).mpr),
-    prf' ← mk_mapp ``function.comp [none, none, none, prf, prf_or_not_imp],
-    clausify_core ⟨imp `(¬ %%a ∨ %%b) d, prf'⟩
-  else
-    congr clausify_core c
-| c@⟨imp `(¬ %%a) b, prf⟩ := do
-  b_prop ← is_prop b.to_expr,
-  if b_prop then
-    clausify_core ⟨or (atom a) b, `((@not_imp_iff_or %%a %%b.to_expr).mp %%prf)⟩
-  else
-    congr clausify_core c
-| ⟨imp `(false) b, prf⟩ := pure []
-| ⟨imp `(true) b, prf⟩ := clausify_core ⟨b, prf.app' `(true.intro)⟩
-| ⟨imp `(@eq Prop %%a %%b) c, prf⟩ := do
-  prf' ← mk_mapp ``propext [a, b],
-  prf' ← mk_mapp ``function.comp [none, none, none, prf, prf'],
-  clausify_core ⟨imp `(%%a ↔ %%b) c, prf'⟩
-| ⟨imp (expr.app (expr.app (expr.app (expr.const ``ne [l]) ty) a) b) c, prf⟩ :=
-  clausify_core ⟨imp ((expr.const' ``eq [l] ty a b).imp `(false)) c, prf⟩
-| ⟨imp `(%%a ↔ %%b) c, prf⟩ :=
-  clausify_core ⟨imp (a.imp b) (imp (b.imp a) c),
-    `((@iff_imp %%a %%b %%c.to_expr).mp %%prf)⟩
+    sk_term ← mk_mapp ``classical.iota [a, nonempty_inst, p],
+    prf ← mk_mapp ``classical.iota_spec [a, nonempty_inst, p],
+    pure $ some [⟨clause_type.imp (p.app' sk_term) (clause_type.atom ab), prf⟩]
+  else do
+    prf ← mk_mapp ``nonempty_or_nonempty_fun [a, b],
+    pure $ some [
+      ⟨(clause_type.atom ab).imp b,
+        expr.lam `_ binder_info.default b $
+          expr.lam n binder_info.default a $ expr.var 1⟩,
+      ⟨clause_type.or (clause_type.nonempty $ clause_type.atom a)
+                      (clause_type.nonempty $ clause_type.atom ab),
+        prf⟩
+    ]
+| c := pure none
 
-| c := congr clausify_core c
+private meta def clausify_pos : expr → tactic (option (list clause))
+| `(false) := pure (some [⟨clause_type.ff.imp `(false), `(@id false)⟩])
+| `(true) := pure (some [])
+| ab@`(%%a ∧ %%b) :=
+  pure $ some [
+    ⟨(clause_type.atom a).imp ab, `(@and.left %%a %%b)⟩,
+    ⟨(clause_type.atom b).imp ab, `(@and.right %%a %%b)⟩
+  ]
+| ab@`(%%a ∨ %%b) :=
+  pure $ some [⟨(clause_type.or (clause_type.atom a) (clause_type.atom b)).imp ab,
+    `(@id.{0} %%ab)⟩]
+| ab@`(_root_.nonempty %%a) :=
+  pure $ some [⟨(clause_type.nonempty (clause_type.atom a)).imp ab, `(@id.{0} %%ab)⟩]
+| ab@`(%%a ↔ %%b) :=
+  pure $ some [
+    ⟨((clause_type.atom b).imp a).imp ab, `(@iff.mp %%a %%b)⟩,
+    ⟨((clause_type.atom a).imp b).imp ab, `(@iff.mpr %%a %%b)⟩
+  ]
+| ab@`(%%a ≠ %%b) := do
+  e ← mk_mapp ``eq [none, a, b],
+  pure $ some [⟨(clause_type.ff.imp e).imp ab, `(@id.{0} %%ab)⟩]
+| not_a@`(¬ %%a) := do
+  pure $ some [⟨clause_type.imp not_a (clause_type.imp a clause_type.ff),
+    `(@id.{0} %%not_a)⟩]
+| ab@`(@Exists %%a %%p) := do
+  prf1 ← mk_mapp ``nonempty_of_exists [a, p],
+  nonempty_ty ← mk_mapp ``_root_.nonempty [a],
+  nonempty_inst ← mk_instance nonempty_ty <|> mk_meta_var nonempty_ty,
+  sk_term ← mk_mapp ``classical.epsilon [a, nonempty_inst, p],
+  prf2 ← mk_mapp ``classical.epsilon_spec' [a, nonempty_inst, p],
+  pure $ some [
+    ⟨clause_type.imp ab (clause_type.nonempty $ clause_type.atom a), prf1⟩,
+    ⟨clause_type.imp ab (clause_type.atom (p.app' sk_term)), prf2⟩
+  ]
+| ab@(expr.pi n bi a b) :=
+  if b.has_var then do
+    m ← mk_meta_var a,
+    pure $ some [⟨clause_type.imp ab (clause_type.atom $ b.instantiate_var m),
+      expr.lam `h binder_info.default ab $ expr.app (expr.var 0) m⟩]
+  else do
+    prf ← mk_mapp ``id [some ab],
+    pure $ some [⟨clause_type.imp ab (clause_type.imp a (clause_type.atom b)), prf⟩]
+| _ := pure none
+
+meta def clausify_idx (c : clause) (l : literal) (i : ℕ) : tactic (option (list clause)) :=
+match l with
+| literal.pos l := do
+  some ds ← clausify_pos l | pure none,
+  option.some <$> ds.mmap (λ d, clause.resolve c i d 0)
+| literal.neg l := do
+  some ds ← clausify_neg l | pure none,
+  option.some <$> ds.mmap (λ d,
+   clause.resolve d (d.num_literals - 1) c i)
 end
 
+meta def clausify_core : clause → tactic (option (list clause)) | c := do
+some cs ← c.literals.zip_with_index.mfoldl (λ acc ⟨l, i⟩,
+  match (acc : option (list clause)) with
+  | some cs := pure (some cs)
+  | none := clausify_idx c l i
+  end) none | pure none,
+(some ∘ list.join) <$>
+  cs.mmap (λ c, do
+    some cs ← clausify_core c | pure [c],
+    pure cs)
+
 meta def clause.clausify (c : clause) : tactic (list clause) := do
-cs ← clausify_core c,
+some cs ← clausify_core c |
+  pure (if c.is_taut then [] else [c]),
 let cs := cs.filter (λ c, ¬ c.is_taut),
-let cs := cs.map clause.distinct,
-let cs := cs.dup_by_native (λ c, c.ty.to_expr),
+cs ← cs.mmap clause.distinct,
+-- TODO
+-- let cs := cs.dup_by_native (λ c, c.ty.to_expr),
 pure cs
 
 meta def clause_type.is_clausified : clause_type → bool
@@ -143,6 +206,7 @@ meta def clause_type.is_clausified : clause_type → bool
 | (atom _) := tt
 | (imp a b) := b.is_clausified
 | (or a b) := a.is_clausified ∧ b.is_clausified
+| (nonempty a) := a.is_clausified
 | ff := tt
 
 meta def clause.is_clausified (c : clause) : bool :=

@@ -13,7 +13,7 @@ retrieve_packed $ do
   (c2, i2, literal.neg a2) ← get_selected_lits [given] | [],
   pure $ do
     some _ ← try_core (unify a1 a2) | pure [],
-    pure [clause.resolve c1.cls i1 c2.cls i2]
+    pure <$> clause.resolve c1.cls i1 c2.cls i2
 
 meta def inference.backward_resolution : inference_rule | given := do
 active ← get_active,
@@ -22,7 +22,7 @@ retrieve_packed $ do
   (c2, i2, literal.neg a2) ← get_selected_lits active.values | [],
   pure $ do
     some _ ← try_core (unify a1 a2) | pure [],
-    pure [clause.resolve c1.cls i1 c2.cls i2]
+    pure <$> clause.resolve c1.cls i1 c2.cls i2
 
 meta def inference.resolution : inference_rule | given :=
 (++) <$> inference.forward_resolution given

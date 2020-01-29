@@ -1,4 +1,4 @@
-import super.resolve
+import super.resolve data.list.alist
 
 namespace super
 
@@ -14,6 +14,8 @@ meta def is_or_ff_clean : clause_type → bool
 | (or a b) := a.is_or_ff_clean ∧ b.is_or_ff_clean
 | (imp _ a) := a.is_or_ff_clean
 | (atom _) := tt
+| (nonempty ff) := bool.ff
+| (nonempty a) := a.is_or_ff_clean
 
 end clause_type
 
@@ -25,60 +27,64 @@ c.ty.is_or_ff_clean
 meta def has_dups (c : clause) : bool :=
 c.ty.has_dups
 
-private meta def distinct_core : clause → list literal → clause
-| c@⟨clause_type.ff, _⟩ _ := c
-| c@⟨clause_type.imp a b, prf⟩ ctx :=
-  match ctx.index_of' (literal.neg a) with
-  | some i := distinct_core ⟨b, prf (expr.var i)⟩ ctx
-  | none :=
-    let ⟨b', prf'⟩ :=
-      distinct_core ⟨b, (prf.lift_vars 0 1).app' (expr.var 0)⟩ (literal.neg a :: ctx) in
-    ⟨clause_type.imp a b', expr.lam a.hyp_name_hint binder_info.default a prf'⟩
+open tactic
+
+meta def mk_elim_cases (e : expr) (c_true c_false : expr) : tactic expr := do
+(expr.pi _ _ _ motive) ← infer_type c_true | fail "mk_elim_cases",
+when motive.has_var (fail "mk_elim_cases: dependent elim"),
+ip ← band <$> is_prop e <*> is_prop motive,
+if ip then do
+  mk_mapp ``classical.by_cases [e, motive, c_true, c_false]
+else do
+  s ← mk_mapp ``classical.type_decidable [e],
+  st ← infer_type s,
+  mk_mapp ``psum.rec [none, none, some (expr.lam `_ binder_info.default st motive), c_true, c_false, s]
+
+private meta def distinct_core : clause → alist (λ _ : literal, expr) → tactic clause
+| c@⟨clause_type.ff, _⟩ _ := pure c
+| ⟨clause_type.imp a b, prf⟩ ctx :=
+  match ctx.lookup (literal.neg a) with
+  | some h := distinct_core ⟨b, prf.app' h⟩ ctx
+  | none := do
+    h ← mk_local_def a.hyp_name_hint a,
+    let ctx := ctx.insert (literal.neg a) h,
+    ⟨b', prfb'⟩ ← distinct_core ⟨b, prf.app' h⟩ ctx,
+    pure ⟨clause_type.imp a b', expr.mk_lambda h prfb'⟩
   end
 | c@⟨clause_type.atom a, prf⟩ ctx :=
-  match ctx.index_of' (literal.pos a) with
-  | some i := ⟨clause_type.ff, (expr.var i).app prf⟩
-  | none := c
+  match ctx.lookup (literal.pos a) with
+  | some h := pure ⟨clause_type.ff, h.app' prf⟩
+  | none := pure c
   end
-| ⟨clause_type.or clause_type.ff b, prf⟩ ctx :=
-  distinct_core ⟨b, `((@false_or %%b.to_expr).mp %%prf)⟩ ctx
-| ⟨clause_type.or a clause_type.ff, prf⟩ ctx :=
-  distinct_core ⟨a, `((@or_false %%a.to_expr).mp %%prf)⟩ ctx
-| c@⟨clause_type.or a b, prf⟩ ctx :=
-  if (a.literals ∩ b.literals) = [] then
-    let ⟨a', prfa'⟩ := distinct_core ⟨a, expr.var 0⟩ (literal.neg a.to_expr :: ctx) in
-    let ⟨b', prfb'⟩ := distinct_core ⟨b, expr.var 0⟩ (literal.neg b.to_expr :: ctx) in
-    let res : clause := ⟨clause_type.or a' b',
-    `(@or_imp_congr %%a.to_expr %%a'.to_expr %%b.to_expr %%b'.to_expr
-      %%(expr.lam a.to_expr.hyp_name_hint binder_info.default a.to_expr prfa')
-      %%(expr.lam b.to_expr.hyp_name_hint binder_info.default b.to_expr prfb')
-      %%prf)⟩ in
-    if res.is_or_ff_clean then res else distinct_core res ctx
-  else
-    match a with
-    | clause_type.or a1 a2 :=
-      distinct_core ⟨clause_type.or a1 (clause_type.or a2 b),
-        `((@or.assoc %%a1.to_expr %%a2.to_expr %%b.to_expr).mp %%prf)⟩ ctx
-    | clause_type.atom a :=
-      let ⟨b', prf'⟩ := distinct_core ⟨b, expr.var 0⟩
-        (literal.neg b.to_expr :: literal.pos a :: ctx) in
-      let res : clause := ⟨clause_type.or (clause_type.atom a) b',
-        `(@or_imp_congr_right_strong %%a %%b.to_expr %%b'.to_expr
-          %%(expr.lam a.hyp_name_hint binder_info.default `(¬ %%a) $
-            expr.lam b.to_expr.hyp_name_hint binder_info.default b.to_expr prf')
-          %%prf)⟩ in
-      if res.is_or_ff_clean then res else distinct_core res ctx
-    | clause_type.ff := undefined_core "distinct_core ff"
-    | clause_type.imp a1 clause_type.ff :=
-      distinct_core ⟨clause_type.imp a1 b, `((@imp_iff_or_not %%a1 %%b.to_expr).mpr %%prf)⟩ ctx
-    | clause_type.imp a1 a2 :=
-      distinct_core ⟨clause_type.or (clause_type.or (clause_type.imp a1 clause_type.ff) a2) b,
-        `(@or_imp_congr_left %%b.to_expr %%a.to_expr (¬ %%a1 ∨ %%a2.to_expr)
-          %%(`(iff.mp $ @imp_iff_or_not %%a1 %%a2.to_expr)) %%prf)⟩ ctx
-    end
+| c@⟨clause_type.or a b, prf⟩ ctx := do
+  let dups := (a.literals ∩ b.literals) \ ctx.keys,
+  match dups with
+  | (literal.pos l :: _) := do
+    hl ← mk_local_def l.hyp_name_hint l,
+    hnotl ← mk_local_def l.hyp_name_hint (l.imp `(false)),
+    ⟨ab', prfab'⟩ ← distinct_core c (ctx.insert (literal.pos l) hnotl) >>= clause.to_prop,
+    ⟨l', prfl'⟩ ← clause.to_prop ⟨clause_type.atom l, hl⟩,
+    ab'_e ← ab'.to_expr,
+    l'_e ← l'.to_expr,
+    clause.mk (clause_type.or l' ab') <$>
+      mk_elim_cases l
+        (expr.mk_lambda hl `(@or.inl %%l'_e %%ab'_e %%prfl'))
+        (expr.mk_lambda hnotl `(@or.inr %%l'_e %%ab'_e %%prfab'))
+  | (literal.neg l :: _) := do
+    hl ← mk_local_def l.hyp_name_hint l,
+    ⟨ab', prf'⟩ ← distinct_core c (ctx.insert (literal.neg l) hl),
+    pure ⟨clause_type.imp l ab', expr.mk_lambda hl prf'⟩
+  | [] :=
+    or_congr c (λ ca, distinct_core ca ctx) (λ cb, distinct_core cb ctx)
+  end
+| c@⟨clause_type.nonempty a, prf⟩ ctx := do
+  ha ← mk_mapp ``classical.choice [none, prf],
+  distinct_core ⟨a, ha⟩ ctx
 
-meta def distinct (c : clause) : clause :=
-if ¬ c.is_or_ff_clean ∨ c.has_dups then distinct_core c [] else c
+meta def distinct (c : clause) : tactic clause :=
+if c.is_or_ff_clean ∧ ¬ c.has_dups then pure c else
+clause.check_result_if_debug $
+distinct_core c ∅
 
 end clause
 
