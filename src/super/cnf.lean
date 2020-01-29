@@ -180,36 +180,4 @@ cs ← cs.mmap clause.distinct,
 -- let cs := cs.dup_by_native (λ c, c.ty.to_expr),
 pure cs
 
-meta def clause_type.is_clausified : clause_type → bool
-| (atom `(%%a ∧ %%b)) := ff
-| (atom `(%%a ↔ %%b)) := ff
-| (atom (expr.pi n bi t a)) := ff
-| (atom `(%%a ∨ %%b)) := ff
-| (atom `(¬ %%a)) := ff
-| (atom `(@Exists %%α %%p)) := ff
-| (atom `(false)) := ff
-| (atom `(true)) := ff
-| (atom `(@eq Prop %%_ %%_)) := ff
-| (atom `(_ ≠ _)) := ff
-
-| (imp `(%%a ∧ %%b) d) := ff
-| (imp `(%%a ∨ %%b) d) := ff
-| (imp a@`(@Exists %%α %%p) b) := ff
-| (imp (expr.pi n bi a b) d) := ff
-| (imp `(¬ %%a) b) := ff
-| (imp `(false) b) := ff
-| (imp `(true) b) := ff
-| (imp `(@eq Prop %%_ %%_) b) := ff
-| (imp `(%%a ↔ %%b) c) := ff
-| (imp `(_ ≠ _) _) := ff
-
-| (atom _) := tt
-| (imp a b) := b.is_clausified
-| (or a b) := a.is_clausified ∧ b.is_clausified
-| (nonempty a) := a.is_clausified
-| ff := tt
-
-meta def clause.is_clausified (c : clause) : bool :=
-c.ty.is_clausified
-
 end super
