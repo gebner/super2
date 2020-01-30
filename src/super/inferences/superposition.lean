@@ -97,14 +97,15 @@ some () ← try_core (unify l r) | pure [],
 rfl_prf ← mk_eq_refl l,
 pure <$> given.cls.propg_pos i rfl_prf
 
-meta def simplification.pos_refl : simplification_rule | cls :=
-if cls.literals.existsb $ λ l, match l with
-    | (literal.pos `(%%a = %%b)) := a = b
-    | _ := ff
-    end then
-  pure none
-else
-  pure cls
+meta def simplification.pos_refl : simplification_rule | cls := do
+is_redundant ← cls.literals.mfoldl (λ is_redundant l,
+  match is_redundant, l with
+  | tt, _ := pure tt
+  | _, literal.pos `(%%a = %%b) :=
+    succeeds (is_def_eq a b transparency.reducible)
+  | ff, _ := pure ff
+  end) ff,
+if is_redundant then pure none else pure cls
 
 meta def simplification.neg_refl : simplification_rule | cls :=
 first (do
