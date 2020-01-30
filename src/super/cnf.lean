@@ -102,6 +102,11 @@ private meta def clausify_neg : expr → tactic (option (list clause))
                       (clause_type.nonempty $ clause_type.atom ab),
         prf⟩
     ]
+| ab@`(@eq Prop %%a %%b) :=
+  pure $ some [
+    ⟨clause_type.imp `(%%a ↔ %%b) (clause_type.atom ab),
+      `(@propext %%a %%b)⟩
+  ]
 | c := pure none
 
 private meta def clausify_pos : expr → tactic (option (list clause))
@@ -146,6 +151,11 @@ private meta def clausify_pos : expr → tactic (option (list clause))
   else do
     prf ← mk_mapp ``id [some ab],
     pure $ some [⟨clause_type.imp ab (clause_type.imp a (clause_type.atom b)), prf⟩]
+| ab@`(@eq Prop %%a %%b) :=
+  pure $ some [
+    ⟨clause_type.imp ab (clause_type.atom `(%%a ↔ %%b)),
+      `(@iff_of_eq %%a %%b)⟩
+  ]
 | _ := pure none
 
 meta def clausify_idx (c : clause) (l : literal) (i : ℕ) : tactic (option (list clause)) :=
