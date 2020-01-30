@@ -203,6 +203,7 @@ private meta def unfold_defs_core : list (expr × expr) → expr → state_t (rb
       state_t.modify $ λ st, st.erase fn',
       repl' ← abstract_super_steps repl',
       ty' ← state_t.lift $ infer_type repl',
+      ty' ← abstract_super_steps ty',
       pure $ expr.elet lc.local_pp_name ty' repl'
         (e.abstract_local lc.local_uniq_name))
     e
