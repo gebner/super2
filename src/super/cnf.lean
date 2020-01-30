@@ -60,6 +60,8 @@ namespace super
 
 open clause_type tactic
 
+variable (wrap_sk_term : expr → tactic expr)
+
 private meta def clausify_neg : expr → tactic (option (list clause))
 | `(false) := pure (some [])
 | `(true) := pure (some [⟨clause_type.atom `(true), `(true.intro)⟩])
@@ -90,6 +92,7 @@ private meta def clausify_neg : expr → tactic (option (list clause))
     nonempty_inst ← mk_instance nonempty_ty <|> mk_meta_var nonempty_ty,
     let p := expr.lam n bi a b,
     sk_term ← mk_mapp ``classical.iota [a, nonempty_inst, p],
+    sk_term ← wrap_sk_term sk_term,
     prf ← mk_mapp ``classical.iota_spec [a, nonempty_inst, p],
     pure $ some [⟨clause_type.imp (p.app' sk_term) (clause_type.atom ab), prf⟩]
   else do
@@ -138,6 +141,7 @@ private meta def clausify_pos : expr → tactic (option (list clause))
   nonempty_ty ← mk_mapp ``_root_.nonempty [a],
   nonempty_inst ← mk_instance nonempty_ty <|> mk_meta_var nonempty_ty,
   sk_term ← mk_mapp ``classical.epsilon [a, nonempty_inst, p],
+  sk_term ← wrap_sk_term sk_term,
   prf2 ← mk_mapp ``classical.epsilon_spec' [a, nonempty_inst, p],
   pure $ some [
     ⟨clause_type.imp ab (clause_type.nonempty $ clause_type.atom a), prf1⟩,
@@ -161,10 +165,10 @@ private meta def clausify_pos : expr → tactic (option (list clause))
 meta def clausify_idx (c : clause) (l : literal) (i : ℕ) : tactic (option (list clause)) :=
 match l with
 | literal.pos l := do
-  some ds ← clausify_pos l | pure none,
+  some ds ← clausify_pos wrap_sk_term l | pure none,
   option.some <$> ds.mmap (λ d, clause.resolve c i d 0)
 | literal.neg l := do
-  some ds ← clausify_neg l | pure none,
+  some ds ← clausify_neg wrap_sk_term l | pure none,
   option.some <$> ds.mmap (λ d,
    clause.resolve d (d.num_literals - 1) c i)
 end
@@ -173,7 +177,7 @@ meta def clausify_core : clause → tactic (option (list clause)) | c := do
 some cs ← c.literals.zip_with_index.mfoldl (λ acc ⟨l, i⟩,
   match (acc : option (list clause)) with
   | some cs := pure (some cs)
-  | none := clausify_idx c l i
+  | none := clausify_idx wrap_sk_term c l i
   end) none | pure none,
 (some ∘ list.join) <$>
   cs.mmap (λ c, do
@@ -181,7 +185,7 @@ some cs ← c.literals.zip_with_index.mfoldl (λ acc ⟨l, i⟩,
     pure cs)
 
 meta def clause.clausify (c : clause) : tactic (list clause) := do
-some cs ← clausify_core c |
+some cs ← clausify_core wrap_sk_term c |
   pure (if c.is_taut then [] else [c]),
 let cs := cs.filter (λ c, ¬ c.is_taut),
 cs ← cs.mmap clause.distinct,

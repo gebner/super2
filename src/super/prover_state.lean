@@ -137,36 +137,49 @@ meta def retrieve_packed (ps : list (prover (list clause))) : prover (list claus
 (list.join <$> monad.sequence (do p ← ps, pure $ retrieve $ p >>= list.mmap (λ c, c.pack)))
   >>= list.mmap (λ c : packed_clause, clause.check_result_if_debug c.unpack)
 
+private meta def unfold_head1 : expr → tactic expr
+| (expr.const n ls) := do
+  d ← get_decl n,
+  some v ← pure $ d.instantiate_value_univ_params ls
+    | fail "instantiate_value_univ_params",
+  pure v
+| (expr.app a b) := expr.app' <$> unfold_head1 a <*> pure b
+| e := pure e
+
 meta def intern (c : clause) : prover clause := do
 i ← (λ st : prover_state, st.steps.length) <$> get,
-(new_prf, ty, prf) ← c.mk_decl i,
-modify $ λ st, { steps := st.steps ++ [(ty, prf)], ..st },
+new_prf ← c.mk_decl i,
+let step := new_prf.get_app_fn,
+step_repl ← unfold_head1 step,
+modify $ λ st, { steps := st.steps ++ [(step, step_repl)], ..st },
 pure { prf := new_prf, ..c }
+
+meta def intern_sk_term (e : expr) : prover expr := do
+i ← (λ st : prover_state, st.steps.length) <$> get,
+ty ← infer_type e,
+e' ← add_aux_decl ((`_super.sk).mk_numeral (unsigned.of_nat i)) ty e ff,
+let step := e'.get_app_fn,
+step_repl ← unfold_head1 step,
+modify $ λ st, { steps := st.steps ++ [(step, step_repl)], ..st },
+pure e'
 
 meta def intern_derived (c : derived_clause) : prover derived_clause := do
 cls ← intern c.cls,
 pure { cls := cls, ..c }
 
 private meta def abstract_super_steps : expr → state_t (rb_map expr expr) tactic expr
-| (expr.app (expr.app (expr.const ``super.step _) _) ref) := do
-  ``super.ref ← pure ref.get_app_fn.const_name |
-    state_t.lift (tactic.fail "abstract_super_steps ref"),
-  (ty::i::args) ← pure ref.get_app_args |
-    state_t.lift (tactic.fail "abstract_super_steps ref"),
-  some i ← pure i.to_nat | state_t.lift (tactic.fail "abstract_super_steps i"),
-  lc ← flip rb_map.find ty <$> get,
-  ff ← pure (ty.has_var : bool) |
-    state_t.lift (tactic.fail "abstract_super_steps has_var"),
-  lc ← match lc with
+| fn@(expr.const (name.mk_numeral i (name.mk_string cat `_super)) _) := do
+  lc ← flip rb_map.find fn <$> get,
+  match lc with
   | some lc := pure lc
   | none := do
+    ty ← state_t.lift $ infer_type fn,
     lc ← state_t.lift $
-      mk_local' ("step_" ++ to_string i : string)
+      mk_local' (cat ++ "_" ++ to_string i : string)
         binder_info.default ty,
-    state_t.modify $ λ st, st.insert ty lc,
+    state_t.modify $ λ st, st.insert fn lc,
     pure lc
-  end,
-  lc.mk_app <$> args.mmap abstract_super_steps
+  end
 | (expr.lam n bi a b) := expr.lam n bi <$> abstract_super_steps a <*> abstract_super_steps b
 | (expr.pi n bi a b) := expr.pi n bi <$> abstract_super_steps a <*> abstract_super_steps b
 | (expr.elet n a b c) := expr.elet n <$> abstract_super_steps a
@@ -180,16 +193,17 @@ private meta def abstract_super_steps : expr → state_t (rb_map expr expr) tact
 | (expr.app a b) := expr.app <$> abstract_super_steps a <*> abstract_super_steps b
 
 private meta def unfold_defs_core : list (expr × expr) → expr → state_t (rb_map expr expr) tactic expr
-| ((ty,prf) :: steps) e := do
+| (⟨fn, repl⟩ :: steps) e := do
   e ← unfold_defs_core steps e,
   lcs ← rb_map.to_list <$> get,
-  lcs.mfoldr (λ ⟨ty', lc⟩ e, do
-      some prf' ← state_t.lift $ tactic.retrieve $ try_core $
-            unify ty ty' >> instantiate_mvars prf
+  lcs.mfoldr (λ ⟨fn', lc⟩ e, do
+      some repl' ← state_t.lift $ tactic.retrieve $ try_core $
+            unify fn fn' >> instantiate_mvars repl
         | pure e,
-      state_t.modify $ λ st, st.erase ty',
-      prf' ← abstract_super_steps prf',
-      pure $ expr.elet lc.local_pp_name ty' prf'
+      state_t.modify $ λ st, st.erase fn',
+      repl' ← abstract_super_steps repl',
+      ty' ← state_t.lift $ infer_type repl',
+      pure $ expr.elet lc.local_pp_name ty' repl'
         (e.abstract_local lc.local_uniq_name))
     e
 | [] e := abstract_super_steps e

@@ -336,13 +336,9 @@ lcs ← abstract_mvar_telescope mvars >>= mk_locals_core,
 (mvars.zip lcs).mmap' (λ x, unify x.1 x.2),
 c.instantiate_mvars
 
-protected meta def {u} ref {α : Sort u} (i : ℕ) : α := undefined
-protected lemma {u} step (α : Sort u) {a : α} : α := a
-
 namespace clause
 
-meta def mk_decl (c : clause) (i : ℕ) : tactic (expr × expr × expr) :=
-retrieve $ do
+meta def mk_decl (c : clause) (i : ℕ) : tactic expr := do
 c ← c.instantiate_mvars,
 mvars ← c.prf.sorted_mvars,
 free_var_tys ← abstract_mvar_telescope mvars,
@@ -353,10 +349,11 @@ let prf := free_var_tys.foldl (λ e x, expr.lam `x binder_info.default x e)
   (c.prf.abstract_mvars' mvars),
 ty_univ ← infer_univ ty,
 c_ty_univ ← infer_univ c_ty,
-let new_prf := expr.const' ``super.step [c_ty_univ] c_ty
-  ((expr.const' ``super.ref [ty_univ] ty `(i)).mk_app mvars.reverse),
+new_prf ← add_aux_decl ((`_super.step).mk_numeral (unsigned.of_nat i))
+  ty prf (ty_univ = level.zero),
+let new_prf := new_prf.mk_app mvars.reverse,
 clause.check_if_debug ⟨c.ty, new_prf⟩,
-pure (new_prf, ty, prf)
+pure new_prf
 
 end clause
 
