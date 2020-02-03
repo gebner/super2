@@ -236,6 +236,28 @@ end
 meta def tactic.unify_level (l1 l2 : level) : tactic unit :=
 tactic.unify (expr.sort l1) (expr.sort l2)
 
+namespace tactic
+
+meta def minimal_tc_failure : expr → tactic expr | e := do
+ff ← succeeds (type_check e),
+match e with
+| (expr.app a b) := minimal_tc_failure a <|> minimal_tc_failure b
+| (expr.lam n bi a b) :=
+  minimal_tc_failure a <|> (do
+    l ← mk_local' n bi a,
+    minimal_tc_failure (b.instantiate_var a))
+| (expr.pi n bi a b) :=
+  minimal_tc_failure a <|> (do
+    l ← mk_local' n bi a,
+    minimal_tc_failure (b.instantiate_var a))
+| (expr.elet n t v b) :=
+  minimal_tc_failure t <|> minimal_tc_failure v <|>
+    minimal_tc_failure (b.instantiate_var v)
+| e := pure e
+end <|> pure e
+
+end tactic
+
 -- decidable instance for bounded existence is not short-circuiting?!?
 def list.existsb {α} (p : α → bool) : list α → bool
 | [] := ff
