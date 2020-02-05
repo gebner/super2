@@ -1,6 +1,16 @@
 import super.clause super.distinct
 universes u v
 
+#print or.rec
+#print Exists.rec
+#print nat.less_than_or_equal.rec
+#print eq.rec
+#print trivial
+#print true
+#print default.sizeof
+#print cond
+#print measure
+
 namespace classical
 
 noncomputable def not_not' {α : Sort u} (h : (α → false) → false) : α :=
@@ -33,7 +43,7 @@ end classical
 namespace Exists
 
 noncomputable def witness {α} {p : α → Prop} (h : ∃ x, p x) : α :=
-classical.choice (nonempty_of_exists h)
+classical.some h
 
 end Exists
 
@@ -78,7 +88,7 @@ private meta def clausify_neg : expr → tactic (option (list clause))
   pure $ some [⟨(clause_type.atom a).imp (p.app' m), prf⟩]
 | not_a@`(¬ %%a) := do
   prf ← mk_mapp ``classical.or_not [a],
-  pure $ some [⟨clause_type.or (clause_type.atom a) (clause_type.atom not_a), prf⟩]
+  pure $ some [⟨clause_type.disj tt (clause_type.atom a) (clause_type.atom not_a), prf⟩]
 | ab@`(%%a ↔ %%b) :=
   pure $ some [⟨((clause_type.atom ab).imp (b.imp a)).imp (a.imp b),
     `(@iff.intro %%a %%b)⟩]
@@ -101,7 +111,7 @@ private meta def clausify_neg : expr → tactic (option (list clause))
       ⟨(clause_type.atom ab).imp b,
         expr.lam `_ binder_info.default b $
           expr.lam n binder_info.default a $ expr.var 1⟩,
-      ⟨clause_type.or (clause_type.nonempty $ clause_type.atom a)
+      ⟨clause_type.disj tt (clause_type.nonempty $ clause_type.atom a)
                       (clause_type.nonempty $ clause_type.atom ab),
         prf⟩
     ]
@@ -121,7 +131,7 @@ private meta def clausify_pos : expr → tactic (option (list clause))
     ⟨(clause_type.atom b).imp ab, `(@and.right %%a %%b)⟩
   ]
 | ab@`(%%a ∨ %%b) :=
-  pure $ some [⟨(clause_type.or (clause_type.atom a) (clause_type.atom b)).imp ab,
+  pure $ some [⟨(clause_type.disj tt (clause_type.atom a) (clause_type.atom b)).imp ab,
     `(@id.{0} %%ab)⟩]
 | ab@`(_root_.nonempty %%a) :=
   pure $ some [⟨(clause_type.nonempty (clause_type.atom a)).imp ab, `(@id.{0} %%ab)⟩]
