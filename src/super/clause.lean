@@ -45,8 +45,7 @@ end literal
 meta inductive clause_type
 | ff
 | imp (a : expr) (b : clause_type)
-| or (a : clause_type) (b : clause_type)
-| nonempty (a : clause_type)
+| disj (is_or : bool) (a : clause_type) (b : clause_type)
 | atom (a : expr)
 
 namespace clause_type
@@ -54,8 +53,7 @@ namespace clause_type
 protected meta def to_string : clause_type → string
 | ff := "ff"
 | (imp a b) := "(imp " ++ a.to_string ++ " " ++ b.to_string ++ ")"
-| (or a b) := "(or " ++ a.to_string ++ " " ++ b.to_string ++ ")"
-| (nonempty a) := "(nonempty " ++ a.to_string ++ ")"
+| (disj io a b) := "(disj " ++ repr io ++ " " ++ a.to_string ++ " " ++ b.to_string ++ ")"
 | (atom a) := "(atom " ++ a.to_string ++ ")"
 
 meta instance : has_to_string clause_type := ⟨clause_type.to_string⟩
@@ -64,17 +62,16 @@ meta instance : has_repr clause_type := ⟨clause_type.to_string⟩
 protected meta def to_tactic_fmt : clause_type → tactic format
 | ff := pure "ff"
 | (imp a b) := do a ← pp a, b ← b.to_tactic_fmt, pure $ format.form ["imp", a.paren, b]
-| (or a b) := do a ← a.to_tactic_fmt, b ← b.to_tactic_fmt, pure $ format.form ["or", a, b]
-| (nonempty a) := do a ← a.to_tactic_fmt, pure $ format.form ["nonempty", a]
+| (disj io a b) := do a ← a.to_tactic_fmt, b ← b.to_tactic_fmt, pure $ format.form ["or", to_fmt io, a, b]
 | (atom a) := do a ← pp a, pure $ format.form ["atom", a]
 
 meta instance : has_to_tactic_format clause_type := ⟨clause_type.to_tactic_fmt⟩
 
 meta def of_expr : expr → tactic clause_type
-| `(%%a ∨ %%b) := or <$> of_expr a <*> of_expr b
+| `(%%a ∨ %%b) := disj tt <$> of_expr a <*> of_expr b
 | `(false) := pure ff
 | `(¬ %%a) := pure $ imp a ff
-| `(_root_.nonempty %%a) := nonempty <$> of_expr a
+| `(psum %%a %%b) := disj bool.ff <$> of_expr a <*> of_expr b
 | e@(expr.pi _ _ a b) :=
   if b.has_var then
     pure $ atom e
@@ -84,8 +81,8 @@ meta def of_expr : expr → tactic clause_type
 
 meta def to_expr : clause_type → tactic expr
 | ff := pure `(false)
-| (or a b) := do a ← a.to_expr, b ← b.to_expr, pure `(%%a ∨ %%b)
-| (nonempty a) := do a ← a.to_expr, mk_mapp ``_root_.nonempty [a]
+| (disj tt a b) := do a ← a.to_expr, b ← b.to_expr, pure `(%%a ∨ %%b)
+| (disj bool.ff a b) := do a ← a.to_expr, b ← b.to_expr, mk_mapp ``psum [a,b]
 | (imp a ff) := do
   ip ← is_prop a,
   pure $ if ip then `(¬ %%a) else a.imp `(false)
@@ -94,76 +91,67 @@ meta def to_expr : clause_type → tactic expr
 
 meta def to_expr_wrong : clause_type → expr
 | ff := `(false)
-| (or a b) := `(%%a.to_expr_wrong ∨ %%b.to_expr_wrong)
+| (disj tt a b) := `(%%a.to_expr_wrong ∨ %%b.to_expr_wrong)
+| (disj bool.ff a b) := `(psum.{1 1} %%a.to_expr_wrong %%b.to_expr_wrong)
 | (imp a ff) := `(¬ %%a)
 | (imp a b) := `((%%a : Prop) → %%b.to_expr_wrong : Prop)
 | (atom a) := a
-| (nonempty a) := `(_root_.nonempty.{0} %%a.to_expr_wrong)
 
 meta def literals : clause_type → list literal
 | ff := []
-| (or a b) := a.literals ++ b.literals
+| (disj _ a b) := a.literals ++ b.literals
 | (imp a b) := literal.neg a :: b.literals
 | (atom a) := [literal.pos a]
-| (nonempty a) := a.literals
 
 meta def num_literals (ty : clause_type) : ℕ :=
 ty.literals.length
 
 meta def num_pos_literals : clause_type → ℕ
 | ff := 0
-| (or a b) := a.num_pos_literals + b.num_pos_literals
+| (disj _ a b) := a.num_pos_literals + b.num_pos_literals
 | (imp a b) := b.num_pos_literals
-| (nonempty a) := a.num_pos_literals
 | (atom a) := 1
 
 meta def num_neg_literals : clause_type → ℕ
 | ff := 0
-| (or a b) := a.num_neg_literals + b.num_neg_literals
+| (disj _ a b) := a.num_neg_literals + b.num_neg_literals
 | (imp a b) := b.num_neg_literals + 1
-| (nonempty a) := a.num_neg_literals
 | (atom a) := 0
 
 meta def instantiate_mvars : clause_type → tactic clause_type
 | ff := pure ff
-| (or a b) := or <$> instantiate_mvars a <*> instantiate_mvars b
+| (disj io a b) := disj io <$> instantiate_mvars a <*> instantiate_mvars b
 | (imp a b) := imp <$> tactic.instantiate_mvars a <*> instantiate_mvars b
-| (nonempty a) := nonempty <$> instantiate_mvars a
 | (atom a) := atom <$> tactic.instantiate_mvars a
 
 meta def abstract_mvars (mvars : list name) : clause_type → clause_type
 | ff := ff
-| (or a b) := or a.abstract_mvars b.abstract_mvars
+| (disj io a b) := disj io a.abstract_mvars b.abstract_mvars
 | (imp a b) := imp (a.abstract_mvars mvars) b.abstract_mvars
-| (nonempty a) := nonempty a.abstract_mvars
 | (atom a) := atom (a.abstract_mvars mvars)
 
 meta def abstract_locals (locals : list name) : clause_type → clause_type
 | ff := ff
-| (or a b) := or a.abstract_locals b.abstract_locals
+| (disj io a b) := disj io a.abstract_locals b.abstract_locals
 | (imp a b) := imp (a.abstract_locals locals) b.abstract_locals
-| (nonempty a) := nonempty a.abstract_locals
 | (atom a) := atom (a.abstract_locals locals)
 
 meta def instantiate_vars (es : list expr) : clause_type → clause_type
 | ff := ff
-| (or a b) := or a.instantiate_vars b.instantiate_vars
+| (disj io a b) := disj io a.instantiate_vars b.instantiate_vars
 | (imp a b) := imp (a.instantiate_vars es) b.instantiate_vars
-| (nonempty a) := nonempty a.instantiate_vars
 | (atom a) := atom (a.instantiate_vars es)
 
 meta def instantiate_univ_mvars (subst : rb_map name level) : clause_type → clause_type
 | ff := ff
-| (or a b) := or a.instantiate_univ_mvars b.instantiate_univ_mvars
+| (disj io a b) := disj io a.instantiate_univ_mvars b.instantiate_univ_mvars
 | (imp a b) := imp (a.instantiate_univ_mvars subst) b.instantiate_univ_mvars
-| (nonempty a) := nonempty a.instantiate_univ_mvars
 | (atom a) := atom (a.instantiate_univ_mvars subst)
 
 meta def instantiate_univ_params (subst : list (name × level)) : clause_type → clause_type
 | ff := ff
-| (or a b) := or a.instantiate_univ_params b.instantiate_univ_params
+| (disj io a b) := disj io a.instantiate_univ_params b.instantiate_univ_params
 | (imp a b) := imp (a.instantiate_univ_params subst) b.instantiate_univ_params
-| (nonempty a) := nonempty a.instantiate_univ_params
 | (atom a) := atom (a.instantiate_univ_params subst)
 
 meta def pos_lits (ty : clause_type) : list expr :=
@@ -205,12 +193,6 @@ ty ← infer_type prf,
 ty ← instantiate_mvars ty,
 ty ← head_beta ty,
 of_type_and_proof ty prf
-
-meta def to_prop (c : clause) : tactic clause := do
-c_ty ← c.ty.to_expr,
-bool.ff ← is_prop c_ty | pure c,
-prf' ← mk_mapp ``_root_.nonempty.intro [c_ty, c.prf],
-pure ⟨clause_type.nonempty c.ty, prf'⟩
 
 meta def literals (c : clause) : list literal :=
 c.ty.literals

@@ -1,8 +1,8 @@
 [package]
 name = "super2"
 version = "0.1"
-lean_version = "3.4.2"
+lean_version = "leanprover-community/lean:3.5.1"
 path = "src"
 
 [dependencies]
-mathlib = {git = "https://github.com/leanprover-community/mathlib", rev = "89fd08834bca00a7bd47b57c3cd8e78bba6216c9"}
+mathlib = {git = "https://github.com/leanprover-community/mathlib", rev = "777f21412d557ba089b94a563048af9c6f27b9de"}

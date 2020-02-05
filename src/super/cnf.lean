@@ -33,12 +33,21 @@ end classical
 namespace Exists
 
 noncomputable def witness {α} {p : α → Prop} (h : ∃ x, p x) : α :=
-classical.choice (nonempty_of_exists h)
+classical.some h
 
 end Exists
 
 section
 open_locale classical
+
+noncomputable def psum_pi {α : Sort u} {β : α → Sort v} : psum α (∀ x, β x) :=
+match classical.type_decidable α with
+| psum.inl ha := psum.inl ha
+| psum.inr hna := psum.inr (λ a, (hna a).elim)
+end
+
+noncomputable def psum_fun {α : Sort u} {β : Sort v} : psum α (α → β) :=
+psum_pi
 
 lemma nonempty_or_nonempty_pi {α : Sort u} {β : α → Sort v} :
   nonempty α ∨ nonempty (∀ x, β x) :=
@@ -78,13 +87,13 @@ private meta def clausify_neg : expr → tactic (option (list clause))
   pure $ some [⟨(clause_type.atom a).imp (p.app' m), prf⟩]
 | not_a@`(¬ %%a) := do
   prf ← mk_mapp ``classical.or_not [a],
-  pure $ some [⟨clause_type.or (clause_type.atom a) (clause_type.atom not_a), prf⟩]
+  pure $ some [⟨clause_type.disj tt (clause_type.atom a) (clause_type.atom not_a), prf⟩]
 | ab@`(%%a ↔ %%b) :=
   pure $ some [⟨((clause_type.atom ab).imp (b.imp a)).imp (a.imp b),
     `(@iff.intro %%a %%b)⟩]
 | ab@`(%%a ≠ %%b) := do
   e ← mk_mapp ``eq [none, a, b],
-  pure $ some [⟨(clause_type.atom e).or (clause_type.atom ab),
+  pure $ some [⟨(clause_type.atom e).disj tt (clause_type.atom ab),
     `(@classical.or_not %%e)⟩]
 | ab@(expr.pi n bi a b) := do
   if b.has_var then do
@@ -96,13 +105,12 @@ private meta def clausify_neg : expr → tactic (option (list clause))
     prf ← mk_mapp ``classical.iota_spec [a, nonempty_inst, p],
     pure $ some [⟨clause_type.imp (p.app' sk_term) (clause_type.atom ab), prf⟩]
   else do
-    prf ← mk_mapp ``nonempty_or_nonempty_fun [a, b],
+    prf ← mk_mapp ``psum_fun [a, b],
     pure $ some [
       ⟨(clause_type.atom ab).imp b,
         expr.lam `_ binder_info.default b $
           expr.lam n binder_info.default a $ expr.var 1⟩,
-      ⟨clause_type.or (clause_type.nonempty $ clause_type.atom a)
-                      (clause_type.nonempty $ clause_type.atom ab),
+      ⟨clause_type.disj ff (clause_type.atom a) (clause_type.atom ab),
         prf⟩
     ]
 | ab@`(@eq Prop %%a %%b) :=
@@ -121,10 +129,8 @@ private meta def clausify_pos : expr → tactic (option (list clause))
     ⟨(clause_type.atom b).imp ab, `(@and.right %%a %%b)⟩
   ]
 | ab@`(%%a ∨ %%b) :=
-  pure $ some [⟨(clause_type.or (clause_type.atom a) (clause_type.atom b)).imp ab,
+  pure $ some [⟨(clause_type.disj tt (clause_type.atom a) (clause_type.atom b)).imp ab,
     `(@id.{0} %%ab)⟩]
-| ab@`(_root_.nonempty %%a) :=
-  pure $ some [⟨(clause_type.nonempty (clause_type.atom a)).imp ab, `(@id.{0} %%ab)⟩]
 | ab@`(%%a ↔ %%b) :=
   pure $ some [
     ⟨((clause_type.atom b).imp a).imp ab, `(@iff.mp %%a %%b)⟩,
@@ -137,14 +143,14 @@ private meta def clausify_pos : expr → tactic (option (list clause))
   pure $ some [⟨clause_type.imp not_a (clause_type.imp a clause_type.ff),
     `(@id.{0} %%not_a)⟩]
 | ab@`(@Exists %%a %%p) := do
-  prf1 ← mk_mapp ``nonempty_of_exists [a, p],
+  prf1 ← mk_mapp ``classical.some [a, p],
   nonempty_ty ← mk_mapp ``_root_.nonempty [a],
   nonempty_inst ← mk_instance nonempty_ty <|> mk_meta_var nonempty_ty,
   sk_term ← mk_mapp ``classical.epsilon [a, nonempty_inst, p],
   sk_term ← wrap_sk_term sk_term,
   prf2 ← mk_mapp ``classical.epsilon_spec' [a, nonempty_inst, p],
   pure $ some [
-    ⟨clause_type.imp ab (clause_type.nonempty $ clause_type.atom a), prf1⟩,
+    ⟨clause_type.imp ab (clause_type.atom a), prf1⟩,
     ⟨clause_type.imp ab (clause_type.atom (p.app' sk_term)), prf2⟩
   ]
 | ab@(expr.pi n bi a b) :=
