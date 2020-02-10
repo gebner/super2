@@ -30,8 +30,16 @@ let c_subst : clause :=
   ⟨clause_type.imp eq_f (clause_type.imp (ctx.app' l')
     (clause_type.atom (ctx.app' r'))),
    prf_subst⟩,
-a' ← clause.resolve a ai c_subst 0,
 unify t.formula (ctx.app' l),
+a' ← clause.resolve a ai c_subst 0,
+
+-- huge hack: unify for some reason doesn't
+-- seem to infer some type class instances...
+ms ← l.sorted_mvars, ms.mmap' (λ m, do
+  t ← infer_type m >>= instantiate_mvars,
+  if t.has_meta_var then skip
+  else try $ mk_instance t >>= unify m),
+
 if t.is_pos then
   clause.resolve b bi a' ai
 else
