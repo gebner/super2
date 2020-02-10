@@ -32,7 +32,8 @@ meta def lex_ma (lpo : expr → expr → bool) (s t : expr) : list expr → list
 
 meta def lpo (prec_gt : expr → expr → bool) : expr → expr → bool | s t :=
 if prec_gt (get_app_fn s) (get_app_fn t) then majo lpo s (get_app_args t)
-else if get_app_fn s = get_app_fn t then lex_ma lpo s t (get_app_args s) (get_app_args t)
+else if get_app_fn s = get_app_fn t then
+  lex_ma lpo s t (get_app_args s).reverse (get_app_args t).reverse
 else alpha lpo (get_app_args s) t
 
 meta def name_of_funsym : expr → name

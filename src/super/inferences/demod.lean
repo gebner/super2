@@ -8,7 +8,7 @@ variables (gt : term_order)
 meta def get_simpl_clauses : prover (list (expr × expr × clause)) := do
 act ← get_active,
 pure $ do act ← act.values,
-          clause_type.atom `(%%r = %%l) ← pure act.cls.ty | [],
+          clause_type.atom `(%%l = %%r) ← pure act.cls.ty | [],
           pure (l,r,act.cls)
 
 variables (simpl_clauses : list (expr × expr × clause))
@@ -26,7 +26,7 @@ ctx ← kabstract e l transparency.reducible ff,
 guard $ ctx.has_var,
 let ctx := expr.lam ty.hyp_name_hint binder_info.default ty ctx,
 type_check ctx,
-prf ← mk_mapp ``congr_arg [none, none, r, l, ctx, cls.prf],
+prf ← mk_mapp ``congr_arg [none, none, l, r, ctx, cls.prf],
 prf ← instantiate_mvars prf,
 guard $ ¬ prf.has_meta_var,
 pure (ctx.app' r, prf)
@@ -40,7 +40,7 @@ match res with
   match res with
   | none := pure (e', prf)
   | some (e'', prf') := do
-    prf'' ← mk_mapp ``eq.trans [none, e'', e', e, prf', prf],
+    prf'' ← mk_mapp ``eq.trans [none, e, e', e'', prf, prf'],
     pure (e'', prf'')
   end
 end
@@ -54,11 +54,11 @@ meta def simplify_clause (cls : clause) : tactic (option clause) := do
     | none := pure (did_simpl, cls)
     | some (f', prf) :=
       if l.is_pos then do
-        prf ← mk_mapp ``eq.mpr [f', l.formula, prf],
+        prf ← mk_mapp ``eq.mp [l.formula, f', prf],
         let prf : clause := ⟨clause_type.imp l.formula (clause_type.atom f'), prf⟩,
         prod.mk tt <$> clause.resolve cls i prf 0
       else do
-        prf ← mk_mapp ``eq.mp [f', l.formula, prf],
+        prf ← mk_mapp ``eq.mpr [l.formula, f', prf],
         let prf : clause := ⟨clause_type.imp f' (clause_type.atom l.formula), prf⟩,
         prod.mk tt <$> clause.resolve prf 1 cls i
     end)
