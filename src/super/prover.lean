@@ -4,6 +4,7 @@ import super.prover_state super.selection
   super.inferences.subsumption super.inferences.superposition
   super.inferences.factoring super.inferences.inhabited
   super.inferences.demod
+  super.eqn_lemmas
 
 namespace super
 open native tactic
@@ -166,32 +167,24 @@ initial ← initial.mfilter (λ c, do
 some empty_clause ← main opts initial | fail "saturation",
 exact empty_clause
 
-meta def eqn_lemma_clauses (n : name) : tactic (list clause) := do
-ls ← get_eqn_lemmas_for tt n,
-ls.mmap $ λ l, tactic.retrieve (mk_const l >>= clause.of_proof >>= clause.pack)
-                 >>= packed_clause.unpack
-
-meta def eqn_lemma_clauses_of_pexpr_name (n : name) : tactic (list clause) := do
+meta def aux_lemma_clauses_of_pexpr_name (n : name) : tactic (list clause) := do
 p ← resolve_name n,
 let e := p.erase_annotations.get_app_fn.erase_annotations,
 match e with
-| expr.const n _ := do
-ls ← get_eqn_lemmas_for tt n,
-ls.mmap $ λ l, tactic.retrieve (mk_const l >>= clause.of_proof >>= clause.pack)
-                 >>= packed_clause.unpack
+| expr.const n _ := get_aux_lemma_clauses n
 | _ := pure []
 end
 
-meta def eqn_lemma_clauses_of_pexpr : pexpr → tactic (list clause)
-| (expr.const n _) := eqn_lemma_clauses_of_pexpr_name n
-| (expr.local_const n _ _ _) := eqn_lemma_clauses_of_pexpr_name n
+meta def aux_lemma_clauses_of_pexpr : pexpr → tactic (list clause)
+| (expr.const n _) := aux_lemma_clauses_of_pexpr_name n
+| (expr.local_const n _ _ _) := aux_lemma_clauses_of_pexpr_name n
 | _ := pure []
 
 meta def clauses_of_simp_arg_type : simp_arg_type → tactic (list clause)
 | simp_arg_type.all_hyps := do lctx ← local_context, lctx.mmap clause.of_proof
 | (simp_arg_type.except _) := fail "super [-foo] not supported"
 | (simp_arg_type.expr e) := do
-  eqn_lems ← eqn_lemma_clauses_of_pexpr e,
+  eqn_lems ← aux_lemma_clauses_of_pexpr e,
   cls ← tactic.retrieve (to_expr e >>= clause.of_proof >>= clause.pack) >>= packed_clause.unpack,
   pure (cls :: eqn_lems)
 

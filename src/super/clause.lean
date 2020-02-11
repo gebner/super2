@@ -194,6 +194,9 @@ ty ← instantiate_mvars ty,
 ty ← head_beta ty,
 of_type_and_proof ty prf
 
+meta def of_const (n : name) : tactic clause :=
+mk_const n >>= of_proof
+
 meta def literals (c : clause) : list literal :=
 c.ty.literals
 
