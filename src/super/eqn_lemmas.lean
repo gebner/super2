@@ -8,27 +8,46 @@ meta def get_eqn_lemma_clauses (n : name) : tactic (list clause) := do
 els ← get_eqn_lemmas_for tt n,
 els.mmap clause.of_const
 
+private meta def old_fields : native.rb_map string name :=
+let old_fields := [
+  ``has_zero.zero,
+  ``has_one.one,
+  ``has_div.div,
+  ``has_le.le,
+  ``has_lt.lt,
+  ``has_add.add,
+  ``has_mul.mul
+] in
+native.rb_map.of_list $ old_fields.map $ λ f, (f.last, f)
+
+private meta def mk_meta_app (c : name) : ℕ → tactic expr
+| 0 := mk_const c
+| (n+1) := do
+  e ← mk_meta_app n,
+  expr.pi _ _ t _ ← infer_type e >>= whnf,
+  m ← mk_meta_var t,
+  pure $ e m
+
 meta def mk_inst_equations_core : expr → expr → tactic (list expr) | lhs rhs := do
 type ← infer_type lhs,
 (type_args, tgt) ← mk_local_pis_whnf type,
-if type_args ≠ [] then do
-  let lhs := lhs.mk_app type_args,
-  let rhs := rhs.instantiate_lambdas_or_apps type_args,
-  eqns ← mk_inst_equations_core lhs rhs,
-  pure $ eqns.map (mk_lambdas type_args)
-else do
-  lhs ← whnf lhs transparency.reducible,
-  tgt ← whnf tgt,
-  let str := tgt.get_app_fn.const_name,
-  is_cls ← has_attribute' `class str,
-  e ← get_env,
-  if is_cls ∧ e.is_structure str then do
+tgt ← whnf tgt,
+let str := tgt.get_app_fn.const_name,
+is_cls ← has_attribute' `class str,
+e ← get_env,
+if is_cls ∧ e.is_structure str then do
+  if type_args ≠ [] then do
+    let lhs := lhs.mk_app type_args,
+    let rhs := rhs.instantiate_lambdas_or_apps type_args,
+    eqns ← mk_inst_equations_core lhs rhs,
+    pure $ eqns.map (mk_lambdas type_args)
+  else do
+    lhs ← whnf lhs transparency.reducible,
     projs ← e.structure_fields_full str,
     [intro] ← return $ e.constructors_of str | fail "unreachable code (3)",
     let params := get_app_args tgt, -- the parameters of the structure
     rhs ← whnf rhs,
     if is_constant_of rhs.get_app_fn intro then do -- if the value is a constructor application
-      guard (rhs.get_app_args.take params.length = params) <|> fail "unreachable code (1)",
       let rhs_args := rhs.get_app_args.drop params.length, -- the fields of the structure
       guard (rhs_args.length = projs.length) <|> fail "unreachable code (2)",
       list.join <$> (projs.zip rhs_args).mmap (λ ⟨proj, new_rhs⟩, do
@@ -38,16 +57,24 @@ else do
           -- Prop field
           pure []
         else do
-          new_lhs ← mk_mapp proj $ (params ++ [lhs]).map some,
+          new_lhs ← mk_mapp proj ((params ++ [lhs]).map some),
+          new_lhs ← (do
+              (name.mk_string field_name _) ← pure proj,
+              some new_proj_name ← pure (old_fields.find field_name),
+              let new_params := e.inductive_num_params new_proj_name.get_prefix,
+              new_proj ← mk_meta_app new_proj_name (new_params + 1),
+              unify_with_type new_proj new_lhs,
+              pure new_proj)
+            <|> mk_mapp proj ((params ++ [lhs]).map some),
           mk_inst_equations_core new_lhs new_rhs)
     else do
       -- class subfield that doesn't reduce to a constructor
       pure []
-  else do
-    -- non-class field
-    e ← mk_mapp ``eq [none, lhs, rhs],
-    prfl ← mk_eq_refl lhs,
-    pure <$> (expr.app <$> mk_mapp ``id_rhs [e] <*> pure prfl)
+else do
+  -- non-class field
+  e ← mk_mapp ``eq [none, lhs, rhs],
+  prfl ← mk_eq_refl lhs,
+  pure <$> (expr.app <$> mk_mapp ``id_rhs [e] <*> pure prfl)
 
 meta def mk_inst_equations (n : name) : tactic (list expr) := do
 lhs ← mk_const n,

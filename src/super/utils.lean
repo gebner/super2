@@ -238,6 +238,13 @@ tactic.unify (expr.sort l1) (expr.sort l2)
 
 namespace tactic
 
+meta def unify_with_type (a b : expr) (trnsp := transparency.semireducible) (approx := ff) :
+  tactic unit := do
+ta ← infer_type a,
+tb ← infer_type b,
+unify ta tb trnsp approx,
+unify a b trnsp approx
+
 meta def minimal_tc_failure : expr → tactic expr | e := do
 ff ← succeeds (type_check e),
 match e with
