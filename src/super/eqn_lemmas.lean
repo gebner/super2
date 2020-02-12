@@ -8,26 +8,6 @@ meta def get_eqn_lemma_clauses (n : name) : tactic (list clause) := do
 els ← get_eqn_lemmas_for tt n,
 els.mmap clause.of_const
 
-private meta def old_fields : native.rb_map string name :=
-let old_fields := [
-  ``has_zero.zero,
-  ``has_one.one,
-  ``has_div.div,
-  ``has_le.le,
-  ``has_lt.lt,
-  ``has_add.add,
-  ``has_mul.mul
-] in
-native.rb_map.of_list $ old_fields.map $ λ f, (f.last, f)
-
-private meta def mk_meta_app (c : name) : ℕ → tactic expr
-| 0 := mk_const c
-| (n+1) := do
-  e ← mk_meta_app n,
-  expr.pi _ _ t _ ← infer_type e >>= whnf,
-  m ← mk_meta_var t,
-  pure $ e m
-
 meta def mk_inst_equations_core : expr → expr → tactic (list expr) | lhs rhs := do
 type ← infer_type lhs,
 (type_args, tgt) ← mk_local_pis_whnf type,
@@ -58,14 +38,6 @@ if is_cls ∧ e.is_structure str then do
           pure []
         else do
           new_lhs ← mk_mapp proj ((params ++ [lhs]).map some),
-          new_lhs ← (do
-              (name.mk_string field_name _) ← pure proj,
-              some new_proj_name ← pure (old_fields.find field_name),
-              let new_params := e.inductive_num_params new_proj_name.get_prefix,
-              new_proj ← mk_meta_app new_proj_name (new_params + 1),
-              unify_with_type new_proj new_lhs,
-              pure new_proj)
-            <|> mk_mapp proj ((params ++ [lhs]).map some),
           mk_inst_equations_core new_lhs new_rhs)
     else do
       -- class subfield that doesn't reduce to a constructor
