@@ -215,22 +215,6 @@ meta def expr.const_levels : expr → list level
 | (expr.const n ls) := ls
 | _ := []
 
-meta def tactic.on_exception {α} (handler : tactic unit) (tac : tactic α) : tactic α :=
-λ s, match tac s with
-| result.exception msg pos s :=
-  match handler s with
-  | result.success () s := result.exception msg pos s
-  | result.exception msg' pos' s :=
-    let msg'' : option (thunk format) := match msg, msg' with
-      | some msg, some msg' := some (λ _, msg () ++ format.line ++ msg' ())
-      | none, msg' := msg'
-      | msg, none := msg
-      end in
-    result.exception msg'' pos s
-  end
-| success := success
-end
-
 @[inline] instance has_monad_lift.refl {m} [monad m] : has_monad_lift m m := ⟨λ _, id⟩
 
 meta def tactic.unify_level (l1 l2 : level) : tactic unit :=

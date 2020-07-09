@@ -183,6 +183,7 @@ meta def aux_lemma_clauses_of_pexpr : pexpr → tactic (list clause)
 meta def clauses_of_simp_arg_type : simp_arg_type → tactic (list clause)
 | simp_arg_type.all_hyps := do lctx ← local_context, lctx.mmap clause.of_proof
 | (simp_arg_type.except _) := fail "super [-foo] not supported"
+| (simp_arg_type.symm_expr e) := clauses_of_simp_arg_type (simp_arg_type.expr e)
 | (simp_arg_type.expr e) := do
   eqn_lems ← aux_lemma_clauses_of_pexpr e,
   cls ← tactic.retrieve (to_expr e >>= clause.of_proof >>= clause.pack) >>= packed_clause.unpack,

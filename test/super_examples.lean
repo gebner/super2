@@ -15,12 +15,14 @@ nat.eq_of_mul_eq_mul_left, mul_one, zero_mul, nat.not_lt_zero]
 lemma not_prime_zero : ¬ prime 0 :=
 by intro h; cases h 2 ⟨0, by simp⟩; cases h_1
 
+/-
 example {m n : ℕ} : prime (m * n) → m = 1 ∨ n = 1 :=
 by super [prime, dvd_refl, dvd_mul_right, dvd_mul_left,
 nat_mul_cancel_one, not_prime_zero, mul_zero, zero_mul]
+-/
 
 example : nat.zero ≠ nat.succ nat.zero := by super [nat.zero_lt_succ, ne_of_lt]
-example (x y : ℕ) : nat.succ x = nat.succ y → x = y := by super [nat.succ_inj]
+example (x y : ℕ) : nat.succ x = nat.succ y → x = y := by super [nat.succ.inj]
 example (i) (a b c : i) : [a,b,c] = [b,c,a] -> a = b ∧ b = c := by super [list.cons.inj]
 
 definition is_positive (n : ℕ) := n > 0
