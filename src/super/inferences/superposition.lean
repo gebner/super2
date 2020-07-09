@@ -6,11 +6,11 @@ open native tactic expr
 meta def clause.flip (c : clause) (i : ℕ) : tactic clause :=
 match c.literals.nth i with
 | some (literal.pos e@(app (app (app (const ``eq [l]) ty) a) b)) :=
-  clause.resolve c i ⟨clause_type.imp e (clause_type.atom (const' ``eq [l] ty b a)),
-    const' ``eq.symm [l] ty a b⟩ 0
+  clause.resolve c i ⟨clause_type.imp e (clause_type.atom (const ``eq [l] ty b a)),
+    const ``eq.symm [l] ty a b⟩ 0
 | some (literal.neg e@(app (app (app (const ``eq [l]) ty) a) b)) :=
-  clause.resolve ⟨clause_type.imp (const' ``eq [l] ty b a) (clause_type.atom e),
-    const' ``eq.symm [l] ty b a⟩ 1 c i
+  clause.resolve ⟨clause_type.imp (const ``eq [l] ty b a) (clause_type.atom e),
+    const ``eq.symm [l] ty b a⟩ 1 c i
 | _ := fail $ "clause_flip " ++ to_string c ++ " " ++ to_string i
 end
 
@@ -22,9 +22,9 @@ some t ← pure $ b.literals.nth bi,
 let prf_subst :=
   let lvls := eq_f.get_app_fn.const_levels in
   if t.is_pos then
-    expr.const' ``eq.subst lvls ty ctx l r
+    expr.const ``eq.subst lvls ty ctx l r
   else
-    expr.const' ``eq.substr lvls ty ctx r l,
+    expr.const ``eq.substr lvls ty ctx r l,
 let (l',r') := if t.is_pos then (l, r) else (r, l),
 let c_subst : clause :=
   ⟨clause_type.imp eq_f (clause_type.imp (ctx.app' l')
@@ -136,7 +136,7 @@ gt ← get_term_order,
 pure <$> c.literals.zip_with_index.mfoldl (λ c l,
   match l.1.formula with
   | e@(app (app (app (const ``eq [lvl]) ty) a) b) := do
-    let e' := const' ``eq [lvl] ty b a,
+    let e' := const ``eq [lvl] ty b a,
     if gt e e' then
       c.flip l.2
     else

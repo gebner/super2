@@ -208,9 +208,6 @@ meta def mk_locals_core : list expr → tactic (list expr)
   lc ← mk_local' t.hyp_name_hint binder_info.default (t.instantiate_vars lcs),
   pure (lc :: lcs)
 
-@[pattern] meta def expr.const' (n : name) (ls : list level) : expr :=
-expr.const n ls
-
 meta def expr.const_levels : expr → list level
 | (expr.const n ls) := ls
 | _ := []
