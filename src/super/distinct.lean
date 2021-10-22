@@ -62,7 +62,7 @@ private meta def distinct_core : clause → alist (λ _ : literal, expr) → tac
   | (literal.pos l :: _) := do
     l_ip ← is_prop l,
     clnl : clause ← (if l_ip then do
-        prf ← mk_mapp ``classical.or_not [l],
+        prf ← mk_mapp ``or_not [l],
         pure (⟨clause_type.disj tt (clause_type.atom l)
           (clause_type.imp l clause_type.ff), prf⟩ : clause)
       else do

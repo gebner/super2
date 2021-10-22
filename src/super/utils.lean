@@ -156,7 +156,7 @@ iff.intro (λ h ha hb, h ⟨ha, hb⟩) (λ h ⟨ha, hb⟩, h ha hb)
 
 lemma classical.forall_imp_iff_exists_not_or {α} {p : α → Prop} {q : Prop} :
   ((∀ x, p x) → q) ↔ ((∃ x, ¬ p x) ∨ q) :=
-by simp [imp_iff_or_not, classical.not_forall]
+by simp [imp_iff_or_not]
 
 def list.has_dups_core {α} [decidable_eq α] : list α → list α → bool
 | (x::xs) ys := x ∈ ys ∨ xs.has_dups_core (x::ys)

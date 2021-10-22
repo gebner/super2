@@ -148,7 +148,7 @@ match classical.type_decidable α with
 end
 
 meta def better_contradiction : tactic expr :=
-tactic.by_contradiction <|>
+tactic.by_contradiction `h <|>
   (applyc ``super_contradiction >> intro1)
 
 meta def solve_with_goal (opts : options) (initial : list clause) : tactic unit := do

@@ -86,7 +86,7 @@ private meta def clausify_neg : expr → tactic (option (list clause))
   prf ← mk_mapp ``exists.intro [α, p, m],
   pure $ some [⟨(clause_type.atom a).imp (p.app' m), prf⟩]
 | not_a@`(¬ %%a) := do
-  prf ← mk_mapp ``classical.or_not [a],
+  prf ← mk_mapp ``or_not [a],
   pure $ some [⟨clause_type.disj tt (clause_type.atom a) (clause_type.atom not_a), prf⟩]
 | ab@`(%%a ↔ %%b) :=
   pure $ some [⟨((clause_type.atom ab).imp (b.imp a)).imp (a.imp b),
@@ -94,7 +94,7 @@ private meta def clausify_neg : expr → tactic (option (list clause))
 | ab@`(%%a ≠ %%b) := do
   e ← mk_mapp ``eq [none, a, b],
   pure $ some [⟨(clause_type.atom e).disj tt (clause_type.atom ab),
-    `(@classical.or_not %%e)⟩]
+    `(@or_not %%e)⟩]
 | ab@(expr.pi n bi a b) := do
   if b.has_var then do
     nonempty_ty ← mk_mapp ``_root_.nonempty [a],

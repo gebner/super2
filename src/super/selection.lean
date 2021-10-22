@@ -82,6 +82,17 @@ meta def age_of_clause_id : name → ℕ
 | (name.mk_numeral i _) := unsigned.to_nat i
 | _ := 0
 
+local attribute [instance] def prod.has_lt {α β} [has_lt α] [has_lt β] : has_lt (α × β) :=
+⟨λ s t, s.1 < t.1 ∨ (s.1 = t.1 ∧ s.2 < t.2)⟩
+
+local attribute [instance]
+def prod_has_decidable_lt {α β}
+         [has_lt α] [has_lt β]
+         [decidable_eq α] [decidable_eq β]
+         [decidable_rel ((<) : α → α → Prop)]
+         [decidable_rel ((<) : β → β → Prop)] : Π s t : α × β, decidable (s < t) :=
+λ t s, or.decidable
+
 meta def find_minimal_weight (passive : rb_map clause_id derived_clause) : clause_id :=
 (derived_clause.id <$> find_minimal_by passive.values (λ c, (clause_weight c, c.id)))
   .get_or_else undefined

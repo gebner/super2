@@ -1,4 +1,5 @@
 import super.utils super.clause
+import tactic.binder_matching
 
 open tactic expr
 
@@ -10,7 +11,7 @@ els.mmap clause.of_const
 
 meta def mk_inst_equations_core : expr → expr → tactic (list expr) | lhs rhs := do
 type ← infer_type lhs,
-(type_args, tgt) ← mk_local_pis_whnf type,
+(type_args, tgt) ← open_pis_whnf type,
 tgt ← whnf tgt,
 let str := tgt.get_app_fn.const_name,
 is_cls ← has_attribute' `class str,
